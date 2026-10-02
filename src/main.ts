@@ -5,6 +5,7 @@ import {
   TableControlsViewType,
 } from './table-controls-view';
 import { TableEditor } from './table-editor';
+import { addTableFilters } from './table-filters';
 import { Extension, Prec } from '@codemirror/state';
 import { KeyBinding, keymap } from '@codemirror/view';
 import { FormatType } from '@tgrosinger/md-advanced-tables';
@@ -35,6 +36,9 @@ export default class TableEditorPlugin extends Plugin {
     );
 
     addIcons();
+    this.registerMarkdownPostProcessor((element) => {
+      addTableFilters(element);
+    });
 
     if (this.settings.showRibbonIcon) {
       this.addRibbonIcon('spreadsheet', 'Advanced Tables Toolbar', () => {

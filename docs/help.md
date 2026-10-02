@@ -24,6 +24,16 @@ Evaluating formulas is done using the formulas button in the toolbar.
 When using the sort option in the toolbar, the sort will be performed based
 on the column the cursor is currently in.
 
+## Filtering rendered tables
+
+Tables with headers have a filter dropdown in each header when viewed in
+Reading view. Selecting a value hides rows that do not match the selected
+value. Filters can be combined across columns, and selecting `All` removes a
+filter.
+
+Filtering is cosmetic: it only changes the rendered view and never changes the
+Markdown table.
+
 ## Additional Questions
 
 If you have additional questions which are not covered here, please [create

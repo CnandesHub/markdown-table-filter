@@ -67,6 +67,14 @@
   width: 100%;
 }
 
+.advanced-tables-filter {
+  display: block;
+  max-width: 100%;
+  margin-top: 0.25rem;
+  font-size: var(--font-smallest);
+  font-weight: var(--font-normal);
+}
+
 .advanced-tables-donation {
   width: 70%;
   margin: 0 auto;
