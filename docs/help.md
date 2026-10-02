@@ -32,7 +32,8 @@ value. Filters can be combined across columns; the available values in each
 other filter update to match the remaining visible rows. The filter menu
 includes a partial-match search, value checkboxes, and a `Clear filter` button.
 For example, a search for `available` matches both `available` and
-`not available`.
+`not available`. When a column has no active filter, its values start
+unchecked; select the values to keep and choose `Apply filter`.
 
 Filtering is cosmetic: it only changes the rendered view and never changes the
 Markdown table.

@@ -159,6 +159,16 @@ table thead th {
   text-align: left;
 }
 
+.advanced-tables-filter-apply {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+  cursor: pointer;
+}
+
+.advanced-tables-filter-apply:hover {
+  background: var(--interactive-accent-hover);
+}
+
 .advanced-tables-filter-clear:hover {
   color: var(--interactive-accent);
 }

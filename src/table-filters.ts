@@ -40,6 +40,7 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
     const headerName = getCellText(header) || `column ${columnIndex + 1}`;
     const state: FilterState = { selectedValues: null, search: '' };
     states.set(columnIndex, state);
+    let pendingValues = new Set<string>();
 
     const filterContainer = doc.createElement('span');
     filterContainer.className = 'advanced-tables-filter-container';
@@ -93,24 +94,31 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
           label.className = 'advanced-tables-filter-value';
           const checkbox = doc.createElement('input');
           checkbox.type = 'checkbox';
-          checkbox.checked =
-            state.selectedValues === null || state.selectedValues.has(value);
+          checkbox.checked = pendingValues.has(value);
           checkbox.addEventListener('change', () => {
-            if (state.selectedValues === null) {
-              state.selectedValues = new Set(values);
-            }
             if (checkbox.checked) {
-              state.selectedValues.add(value);
+              pendingValues.add(value);
             } else {
-              state.selectedValues.delete(value);
+              pendingValues.delete(value);
             }
-            applyFilters(body, states);
-            refreshControls(controls);
           });
           label.append(checkbox, doc.createTextNode(value || '(Blanks)'));
           valuesList.appendChild(label);
         });
     };
+
+    const apply = doc.createElement('button');
+    apply.type = 'button';
+    apply.className = 'advanced-tables-filter-apply';
+    apply.textContent = 'Apply filter';
+    apply.addEventListener('click', () => {
+      state.selectedValues =
+        pendingValues.size === 0 ? null : new Set(pendingValues);
+      applyFilters(body, states);
+      refreshControls(controls);
+      menu.hidden = true;
+      filterButton.setAttribute('aria-expanded', 'false');
+    });
 
     const clear = doc.createElement('button');
     clear.type = 'button';
@@ -118,6 +126,7 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
     clear.textContent = 'Clear filter';
     clear.addEventListener('click', () => {
       state.selectedValues = null;
+      pendingValues.clear();
       state.search = '';
       search.value = '';
       applyFilters(body, states);
@@ -131,7 +140,7 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
       updateActiveState();
     });
 
-    menu.append(search, valuesList, clear);
+    menu.append(search, valuesList, apply, clear);
     filterContainer.appendChild(filterButton);
     header.appendChild(filterContainer);
 
@@ -151,6 +160,10 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
       container: filterContainer,
       menu,
       update: () => {
+        pendingValues =
+          state.selectedValues === null
+            ? new Set<string>()
+            : new Set(state.selectedValues);
         updateValues();
         updateActiveState();
       },
