@@ -28,8 +28,9 @@ on the column the cursor is currently in.
 
 Tables with headers have a filter dropdown in each header when viewed in
 Reading view. Selecting a value hides rows that do not match the selected
-value. Filters can be combined across columns, and selecting `All` removes a
-filter.
+value. Filters can be combined across columns; the available values in each
+other filter update to match the remaining visible rows. Selecting `All`
+removes a filter.
 
 Filtering is cosmetic: it only changes the rendered view and never changes the
 Markdown table.

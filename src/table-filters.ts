@@ -24,13 +24,15 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
 
   const filters = new Map<number, FilterValue>();
   const headers = Array.from(headerRow.cells);
+  const filterControls = new Map<
+    number,
+    { filter: HTMLSelectElement; container: HTMLSpanElement }
+  >();
 
   headers.forEach((header, columnIndex) => {
     if (header.querySelector('.advanced-tables-filter')) {
       return;
     }
-
-    const values = getColumnValues(body, columnIndex);
 
     const doc = table.ownerDocument;
     const filterContainer = doc.createElement('span');
@@ -52,19 +54,12 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
     );
     filter.title = 'Filter rows';
 
-    const allOption = doc.createElement('option');
-    allOption.value = ALL_VALUE;
-    allOption.textContent = 'All';
-    filter.appendChild(allOption);
-
-    values.forEach((value, valueIndex) => {
-      const option = doc.createElement('option');
-      option.value = String(valueIndex);
-      option.textContent = value || '(Blanks)';
-      filter.appendChild(option);
-    });
-
     filter.addEventListener('change', () => {
+      const values = getAvailableColumnValues(
+        body,
+        filters,
+        columnIndex,
+      );
       const selectedIndex = Number.parseInt(filter.value, 10);
       filters.set(
         columnIndex,
@@ -75,22 +70,33 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
         filter.value !== ALL_VALUE,
       );
       applyFilters(body, filters);
+      refreshFilterOptions(body, filters, filterControls);
     });
 
     filterContainer.append(filterIcon, filter);
     header.appendChild(filterContainer);
+    filterControls.set(columnIndex, { filter, container: filterContainer });
   });
+
+  refreshFilterOptions(body, filters, filterControls);
 };
 
-const getColumnValues = (
+const getAvailableColumnValues = (
   body: HTMLTableSectionElement,
+  filters: Map<number, FilterValue>,
   columnIndex: number,
 ): string[] => {
   const values = new Set<string>();
 
   Array.from(body.rows).forEach((row) => {
+    const matchesOtherFilters = Array.from(filters.entries()).every(
+      ([filterColumnIndex, value]) =>
+        filterColumnIndex === columnIndex ||
+        value === null ||
+        getCellText(row.cells[filterColumnIndex]) === value,
+    );
     const cell = row.cells[columnIndex];
-    if (cell) {
+    if (cell && matchesOtherFilters) {
       values.add(getCellText(cell));
     }
   });
@@ -98,6 +104,45 @@ const getColumnValues = (
   return Array.from(values).sort((left, right) =>
     left.localeCompare(right, undefined, { numeric: true }),
   );
+};
+
+const refreshFilterOptions = (
+  body: HTMLTableSectionElement,
+  filters: Map<number, FilterValue>,
+  controls: Map<
+    number,
+    { filter: HTMLSelectElement; container: HTMLSpanElement }
+  >,
+): void => {
+  controls.forEach(({ filter, container }, columnIndex) => {
+    const selectedValue = filters.get(columnIndex);
+    const values = getAvailableColumnValues(body, filters, columnIndex);
+    filter.replaceChildren();
+
+    const allOption = filter.ownerDocument.createElement('option');
+    allOption.value = ALL_VALUE;
+    allOption.textContent = 'All';
+    filter.appendChild(allOption);
+
+    values.forEach((value, valueIndex) => {
+      const option = filter.ownerDocument.createElement('option');
+      option.value = String(valueIndex);
+      option.textContent = value || '(Blanks)';
+      filter.appendChild(option);
+    });
+
+    if (selectedValue !== null && selectedValue !== undefined) {
+      const selectedIndex = values.indexOf(selectedValue);
+      if (selectedIndex >= 0) {
+        filter.value = String(selectedIndex);
+      }
+    }
+
+    container.classList.toggle(
+      'advanced-tables-filter-active',
+      selectedValue !== null && selectedValue !== undefined,
+    );
+  });
 };
 
 const getCellText = (cell: HTMLTableCellElement | undefined): string =>
