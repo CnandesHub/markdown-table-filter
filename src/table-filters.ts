@@ -6,6 +6,7 @@ interface FilterState {
 interface FilterControl {
   container: HTMLSpanElement;
   menu: HTMLDivElement;
+  close: () => void;
   update: () => void;
 }
 
@@ -178,6 +179,17 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
     filterButton.addEventListener('click', (event) => {
       event.stopPropagation();
       const isOpen = !menu.hidden;
+      if (isOpen) {
+        controls.get(columnIndex)?.close();
+        return;
+      }
+      if (!isOpen) {
+        controls.forEach((control, controlColumnIndex) => {
+          if (controlColumnIndex !== columnIndex) {
+            control.close();
+          }
+        });
+      }
       if (!isOpen) {
         const buttonRect = filterButton.getBoundingClientRect();
         menu.style.top = `${buttonRect.bottom + 4}px`;
@@ -190,6 +202,14 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
     controls.set(columnIndex, {
       container: filterContainer,
       menu,
+      close: () => {
+        pendingValues =
+          state.selectedValues === null
+            ? new Set<string>()
+            : new Set(state.selectedValues);
+        menu.hidden = true;
+        filterButton.setAttribute('aria-expanded', 'false');
+      },
       update: () => {
         pendingValues =
           state.selectedValues === null
