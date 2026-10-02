@@ -39,6 +39,10 @@ and choose `Apply filter`.
 Filtering is cosmetic: it only changes the rendered view and never changes the
 Markdown table.
 
+Filters are also available in Live Preview. After editing cells or adding,
+removing, or changing rows and columns, the visible rows and filter options are
+updated automatically. Filtered rows remain part of the Markdown table.
+
 ## Additional Questions
 
 If you have additional questions which are not covered here, please [create

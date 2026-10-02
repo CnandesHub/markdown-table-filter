@@ -10,6 +10,8 @@ interface FilterControl {
   update: () => void;
 }
 
+const tableRefreshes = new WeakMap<HTMLTableElement, () => void>();
+
 /**
  * Adds cosmetic, rendered-view filters to tables that have a header row.
  * Changes are limited to the rendered table DOM and never update Markdown.
@@ -17,6 +19,12 @@ interface FilterControl {
 export const addTableFilters = (container: HTMLElement): void => {
   container.querySelectorAll('table').forEach((table) => {
     addFiltersToTable(table);
+  });
+};
+
+export const refreshTableFilters = (container: HTMLElement): void => {
+  container.querySelectorAll('table').forEach((table) => {
+    tableRefreshes.get(table)?.();
   });
 };
 
@@ -30,7 +38,7 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
 
   const states = new Map<number, FilterState>();
   const controls = new Map<number, FilterControl>();
-  const originalRows = Array.from(body.rows);
+  const getRows = (): HTMLTableRowElement[] => Array.from(body.rows);
 
   Array.from(headerRow.cells).forEach((header, columnIndex) => {
     if (header.querySelector('.advanced-tables-filter-container')) {
@@ -88,7 +96,7 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
         state.search.length > 0 ||
         (state.selectedValues !== null &&
           state.selectedValues.size !== getAvailableValues(
-            originalRows,
+          getRows(),
             states,
             columnIndex,
           ).length);
@@ -97,7 +105,7 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
 
     const updateValues = (): void => {
       valuesList.replaceChildren();
-      const values = getAvailableValues(originalRows, states, columnIndex);
+      const values = getAvailableValues(getRows(), states, columnIndex);
       const query = state.search.toLocaleLowerCase();
       const visibleValues = values.filter((value) =>
         value.toLocaleLowerCase().includes(query),
@@ -122,7 +130,7 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
     };
 
     selectAll.addEventListener('click', () => {
-      const values = getAvailableValues(originalRows, states, columnIndex);
+      const values = getAvailableValues(getRows(), states, columnIndex);
       const query = state.search.toLocaleLowerCase();
       values
         .filter((value) => value.toLocaleLowerCase().includes(query))
@@ -131,7 +139,7 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
     });
 
     unselectAll.addEventListener('click', () => {
-      const values = getAvailableValues(originalRows, states, columnIndex);
+      const values = getAvailableValues(getRows(), states, columnIndex);
       const query = state.search.toLocaleLowerCase();
       values
         .filter((value) => value.toLocaleLowerCase().includes(query))
@@ -147,6 +155,8 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
       state.selectedValues =
         pendingValues.size === 0 ? null : new Set(pendingValues);
       applyFilters(body, states);
+      window.setTimeout(() => applyFilters(body, states), 0);
+      window.setTimeout(() => applyFilters(body, states), 100);
       refreshControls(controls);
       menu.hidden = true;
       filterButton.setAttribute('aria-expanded', 'false');
@@ -221,6 +231,10 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
     });
   });
 
+  tableRefreshes.set(table, () => {
+    applyFilters(body, states);
+    refreshControls(controls);
+  });
   refreshControls(controls);
 };
 
@@ -264,6 +278,14 @@ const applyFilters = (
         matchesState(state, getCellText(row.cells[columnIndex])),
     );
     row.style.display = visible ? '' : 'none';
+    row.hidden = !visible;
+    row.classList.toggle('advanced-tables-filtered-row', !visible);
+    row.setAttribute('aria-hidden', String(!visible));
+    if (visible) {
+      row.removeAttribute('data-advanced-tables-hidden');
+    } else {
+      row.setAttribute('data-advanced-tables-hidden', 'true');
+    }
   });
 };
 

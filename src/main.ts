@@ -5,9 +5,9 @@ import {
   TableControlsViewType,
 } from './table-controls-view';
 import { TableEditor } from './table-editor';
-import { addTableFilters } from './table-filters';
+import { addTableFilters, refreshTableFilters } from './table-filters';
 import { Extension, Prec } from '@codemirror/state';
-import { KeyBinding, keymap } from '@codemirror/view';
+import * as CodeMirrorView from '@codemirror/view';
 import { FormatType } from '@tgrosinger/md-advanced-tables';
 import {
   App,
@@ -48,6 +48,33 @@ export default class TableEditorPlugin extends Plugin {
 
     // CM6 editor extension for remapping keys
     this.registerEditorExtension(this.makeEditorExtension());
+    this.registerEditorExtension(
+      CodeMirrorView.ViewPlugin.define((view) => {
+        let refreshQueued = false;
+        const refresh = (): void => {
+          if (refreshQueued) {
+            return;
+          }
+          refreshQueued = true;
+          window.setTimeout(() => {
+            refreshQueued = false;
+            addTableFilters(view.dom);
+            refreshTableFilters(view.dom);
+          }, 0);
+        };
+        refresh();
+
+        const observer = new MutationObserver(refresh);
+        observer.observe(view.dom, {
+          childList: true,
+          subtree: true,
+        });
+
+        return {
+          destroy: () => observer.disconnect(),
+        };
+      }),
+    );
 
     this.addCommand({
       id: 'next-row',
@@ -274,7 +301,7 @@ export default class TableEditorPlugin extends Plugin {
 
   // makeEditorExtension is used to bind Tab and Enter in the new CM6 Live Preview editor.
   private readonly makeEditorExtension = (): Extension => {
-    const keymaps: KeyBinding[] = [];
+    const keymaps: CodeMirrorView.KeyBinding[] = [];
 
     if (this.settings.bindEnter) {
       keymaps.push({
@@ -298,7 +325,7 @@ export default class TableEditorPlugin extends Plugin {
       });
     }
 
-    return Prec.highest(keymap.of(keymaps));
+    return Prec.highest(CodeMirrorView.keymap.of(keymaps));
   };
 
   private readonly newPerformTableActionCM6 =
