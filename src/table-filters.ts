@@ -1,12 +1,17 @@
-const ALL_VALUE = 'all';
+interface FilterState {
+  selectedValues: Set<string> | null;
+  search: string;
+}
 
-type FilterValue = string | null;
+interface FilterControl {
+  container: HTMLSpanElement;
+  menu: HTMLDivElement;
+  update: () => void;
+}
 
 /**
  * Adds cosmetic, rendered-view filters to tables that have a header row.
- *
- * The table DOM is owned by Obsidian's renderer, so changing row visibility
- * here does not change the Markdown document or the editor state.
+ * Changes are limited to the rendered table DOM and never update Markdown.
  */
 export const addTableFilters = (container: HTMLElement): void => {
   container.querySelectorAll('table').forEach((table) => {
@@ -22,82 +27,158 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
     return;
   }
 
-  const filters = new Map<number, FilterValue>();
-  const headers = Array.from(headerRow.cells);
-  const filterControls = new Map<
-    number,
-    { filter: HTMLSelectElement; container: HTMLSpanElement }
-  >();
+  const states = new Map<number, FilterState>();
+  const controls = new Map<number, FilterControl>();
+  const originalRows = Array.from(body.rows);
 
-  headers.forEach((header, columnIndex) => {
-    if (header.querySelector('.advanced-tables-filter')) {
+  Array.from(headerRow.cells).forEach((header, columnIndex) => {
+    if (header.querySelector('.advanced-tables-filter-container')) {
       return;
     }
 
     const doc = table.ownerDocument;
+    const headerName = getCellText(header) || `column ${columnIndex + 1}`;
+    const state: FilterState = { selectedValues: null, search: '' };
+    states.set(columnIndex, state);
+
     const filterContainer = doc.createElement('span');
     filterContainer.className = 'advanced-tables-filter-container';
 
-    const filterIcon = doc.createElement('span');
-    filterIcon.className = 'advanced-tables-filter-icon';
-    filterIcon.setAttribute('aria-hidden', 'true');
-    filterIcon.innerHTML =
-      '<svg viewBox="0 0 24 24">' +
+    const filterButton = doc.createElement('button');
+    filterButton.type = 'button';
+    filterButton.className = 'advanced-tables-filter-button';
+    filterButton.setAttribute('aria-label', `Filter ${headerName}`);
+    filterButton.setAttribute('aria-expanded', 'false');
+    filterButton.innerHTML =
+      '<svg viewBox="0 0 24 24" aria-hidden="true">' +
       '<path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"></path>' +
       '</svg>';
 
-    const filter = doc.createElement('select');
-    filter.className = 'advanced-tables-filter';
-    filter.setAttribute(
-      'aria-label',
-      `Filter ${getCellText(header) || `column ${columnIndex + 1}`}`,
-    );
-    filter.title = 'Filter rows';
+    const menu = doc.createElement('div');
+    menu.className = 'advanced-tables-filter-menu';
+    menu.hidden = true;
+    doc.body.appendChild(menu);
+    menu.addEventListener('click', (event) => event.stopPropagation());
 
-    filter.addEventListener('change', () => {
-      const values = getAvailableColumnValues(
-        body,
-        filters,
-        columnIndex,
-      );
-      const selectedIndex = Number.parseInt(filter.value, 10);
-      filters.set(
-        columnIndex,
-        filter.value === ALL_VALUE ? null : values[selectedIndex],
-      );
-      filterContainer.classList.toggle(
-        'advanced-tables-filter-active',
-        filter.value !== ALL_VALUE,
-      );
-      applyFilters(body, filters);
-      refreshFilterOptions(body, filters, filterControls);
+    const search = doc.createElement('input');
+    search.type = 'search';
+    search.className = 'advanced-tables-filter-search';
+    search.placeholder = 'Search values';
+    search.setAttribute('aria-label', `Search ${headerName} values`);
+
+    const valuesList = doc.createElement('div');
+    valuesList.className = 'advanced-tables-filter-values';
+
+    const updateActiveState = (): void => {
+      const active =
+        state.search.length > 0 ||
+        (state.selectedValues !== null &&
+          state.selectedValues.size !== getAvailableValues(
+            originalRows,
+            states,
+            columnIndex,
+          ).length);
+      filterContainer.classList.toggle('advanced-tables-filter-active', active);
+    };
+
+    const updateValues = (): void => {
+      valuesList.replaceChildren();
+      const values = getAvailableValues(originalRows, states, columnIndex);
+      const query = state.search.toLocaleLowerCase();
+
+      values
+        .filter((value) => value.toLocaleLowerCase().includes(query))
+        .forEach((value) => {
+          const label = doc.createElement('label');
+          label.className = 'advanced-tables-filter-value';
+          const checkbox = doc.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.checked =
+            state.selectedValues === null || state.selectedValues.has(value);
+          checkbox.addEventListener('change', () => {
+            if (state.selectedValues === null) {
+              state.selectedValues = new Set(values);
+            }
+            if (checkbox.checked) {
+              state.selectedValues.add(value);
+            } else {
+              state.selectedValues.delete(value);
+            }
+            applyFilters(body, states);
+            refreshControls(controls);
+          });
+          label.append(checkbox, doc.createTextNode(value || '(Blanks)'));
+          valuesList.appendChild(label);
+        });
+    };
+
+    const clear = doc.createElement('button');
+    clear.type = 'button';
+    clear.className = 'advanced-tables-filter-clear';
+    clear.textContent = 'Clear filter';
+    clear.addEventListener('click', () => {
+      state.selectedValues = null;
+      state.search = '';
+      search.value = '';
+      applyFilters(body, states);
+      refreshControls(controls);
     });
 
-    filterContainer.append(filterIcon, filter);
+    search.addEventListener('input', () => {
+      state.search = search.value;
+      applyFilters(body, states);
+      updateValues();
+      updateActiveState();
+    });
+
+    menu.append(search, valuesList, clear);
+    filterContainer.appendChild(filterButton);
     header.appendChild(filterContainer);
-    filterControls.set(columnIndex, { filter, container: filterContainer });
+
+    filterButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const isOpen = !menu.hidden;
+      if (!isOpen) {
+        const buttonRect = filterButton.getBoundingClientRect();
+        menu.style.top = `${buttonRect.bottom + 4}px`;
+        menu.style.left = `${Math.max(8, buttonRect.right - 224)}px`;
+      }
+      menu.hidden = isOpen;
+      filterButton.setAttribute('aria-expanded', String(!isOpen));
+    });
+
+    controls.set(columnIndex, {
+      container: filterContainer,
+      menu,
+      update: () => {
+        updateValues();
+        updateActiveState();
+      },
+    });
   });
 
-  refreshFilterOptions(body, filters, filterControls);
+  refreshControls(controls);
 };
 
-const getAvailableColumnValues = (
-  body: HTMLTableSectionElement,
-  filters: Map<number, FilterValue>,
+const refreshControls = (controls: Map<number, FilterControl>): void => {
+  controls.forEach((control) => control.update());
+};
+
+const getAvailableValues = (
+  rows: HTMLTableRowElement[],
+  states: Map<number, FilterState>,
   columnIndex: number,
 ): string[] => {
   const values = new Set<string>();
 
-  Array.from(body.rows).forEach((row) => {
-    const matchesOtherFilters = Array.from(filters.entries()).every(
-      ([filterColumnIndex, value]) =>
+  rows.forEach((row) => {
+    const matchesOtherFilters = Array.from(states.entries()).every(
+      ([filterColumnIndex, state]) =>
         filterColumnIndex === columnIndex ||
-        value === null ||
-        getCellText(row.cells[filterColumnIndex]) === value,
+        matchesState(state, getCellText(row.cells[filterColumnIndex])),
     );
-    const cell = row.cells[columnIndex];
-    if (cell && matchesOtherFilters) {
-      values.add(getCellText(cell));
+    if (matchesOtherFilters) {
+      values.add(getCellText(row.cells[columnIndex]));
     }
   });
 
@@ -106,58 +187,23 @@ const getAvailableColumnValues = (
   );
 };
 
-const refreshFilterOptions = (
-  body: HTMLTableSectionElement,
-  filters: Map<number, FilterValue>,
-  controls: Map<
-    number,
-    { filter: HTMLSelectElement; container: HTMLSpanElement }
-  >,
-): void => {
-  controls.forEach(({ filter, container }, columnIndex) => {
-    const selectedValue = filters.get(columnIndex);
-    const values = getAvailableColumnValues(body, filters, columnIndex);
-    filter.replaceChildren();
-
-    const allOption = filter.ownerDocument.createElement('option');
-    allOption.value = ALL_VALUE;
-    allOption.textContent = 'All';
-    filter.appendChild(allOption);
-
-    values.forEach((value, valueIndex) => {
-      const option = filter.ownerDocument.createElement('option');
-      option.value = String(valueIndex);
-      option.textContent = value || '(Blanks)';
-      filter.appendChild(option);
-    });
-
-    if (selectedValue !== null && selectedValue !== undefined) {
-      const selectedIndex = values.indexOf(selectedValue);
-      if (selectedIndex >= 0) {
-        filter.value = String(selectedIndex);
-      }
-    }
-
-    container.classList.toggle(
-      'advanced-tables-filter-active',
-      selectedValue !== null && selectedValue !== undefined,
-    );
-  });
-};
-
 const getCellText = (cell: HTMLTableCellElement | undefined): string =>
   cell?.textContent?.trim() ?? '';
 
 const applyFilters = (
   body: HTMLTableSectionElement,
-  filters: Map<number, FilterValue>,
+  states: Map<number, FilterState>,
 ): void => {
   Array.from(body.rows).forEach((row) => {
-    const visible = Array.from(filters.entries()).every(
-      ([columnIndex, value]) =>
-        value === null ||
-        getCellText(row.cells[columnIndex]) === value,
+    const visible = Array.from(states.entries()).every(
+      ([columnIndex, state]) =>
+        matchesState(state, getCellText(row.cells[columnIndex])),
     );
     row.style.display = visible ? '' : 'none';
   });
 };
+
+const matchesState = (state: FilterState, value: string): boolean =>
+  (state.selectedValues === null || state.selectedValues.has(value)) &&
+  (state.search.length === 0 ||
+    value.toLocaleLowerCase().includes(state.search.toLocaleLowerCase()));

@@ -29,8 +29,10 @@ on the column the cursor is currently in.
 Tables with headers have a filter dropdown in each header when viewed in
 Reading view. Selecting a value hides rows that do not match the selected
 value. Filters can be combined across columns; the available values in each
-other filter update to match the remaining visible rows. Selecting `All`
-removes a filter.
+other filter update to match the remaining visible rows. The filter menu
+includes a partial-match search, value checkboxes, and a `Clear filter` button.
+For example, a search for `available` matches both `available` and
+`not available`.
 
 Filtering is cosmetic: it only changes the rendered view and never changes the
 Markdown table.
