@@ -131,6 +131,24 @@ table thead th {
   width: 100%;
 }
 
+.advanced-tables-filter-selection-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.advanced-tables-filter-action {
+  border: 0;
+  padding: 0.2rem 0;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--font-smallest);
+}
+
+.advanced-tables-filter-action:hover {
+  color: var(--interactive-accent);
+}
+
 .advanced-tables-filter-values {
   max-height: 12rem;
   overflow-y: auto;

@@ -67,6 +67,18 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
     search.placeholder = 'Search values';
     search.setAttribute('aria-label', `Search ${headerName} values`);
 
+    const selectionActions = doc.createElement('div');
+    selectionActions.className = 'advanced-tables-filter-selection-actions';
+    const selectAll = doc.createElement('button');
+    selectAll.type = 'button';
+    selectAll.className = 'advanced-tables-filter-action';
+    selectAll.textContent = 'Select all';
+    const unselectAll = doc.createElement('button');
+    unselectAll.type = 'button';
+    unselectAll.className = 'advanced-tables-filter-action';
+    unselectAll.textContent = 'Unselect all';
+    selectionActions.append(selectAll, unselectAll);
+
     const valuesList = doc.createElement('div');
     valuesList.className = 'advanced-tables-filter-values';
 
@@ -86,10 +98,11 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
       valuesList.replaceChildren();
       const values = getAvailableValues(originalRows, states, columnIndex);
       const query = state.search.toLocaleLowerCase();
+      const visibleValues = values.filter((value) =>
+        value.toLocaleLowerCase().includes(query),
+      );
 
-      values
-        .filter((value) => value.toLocaleLowerCase().includes(query))
-        .forEach((value) => {
+      visibleValues.forEach((value) => {
           const label = doc.createElement('label');
           label.className = 'advanced-tables-filter-value';
           const checkbox = doc.createElement('input');
@@ -104,8 +117,26 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
           });
           label.append(checkbox, doc.createTextNode(value || '(Blanks)'));
           valuesList.appendChild(label);
-        });
+      });
     };
+
+    selectAll.addEventListener('click', () => {
+      const values = getAvailableValues(originalRows, states, columnIndex);
+      const query = state.search.toLocaleLowerCase();
+      values
+        .filter((value) => value.toLocaleLowerCase().includes(query))
+        .forEach((value) => pendingValues.add(value));
+      updateValues();
+    });
+
+    unselectAll.addEventListener('click', () => {
+      const values = getAvailableValues(originalRows, states, columnIndex);
+      const query = state.search.toLocaleLowerCase();
+      values
+        .filter((value) => value.toLocaleLowerCase().includes(query))
+        .forEach((value) => pendingValues.delete(value));
+      updateValues();
+    });
 
     const apply = doc.createElement('button');
     apply.type = 'button';
@@ -140,7 +171,7 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
       updateActiveState();
     });
 
-    menu.append(search, valuesList, apply, clear);
+    menu.append(search, selectionActions, valuesList, apply, clear);
     filterContainer.appendChild(filterButton);
     header.appendChild(filterContainer);
 

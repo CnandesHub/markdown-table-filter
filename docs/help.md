@@ -33,7 +33,8 @@ other filter update to match the remaining visible rows. The filter menu
 includes a partial-match search, value checkboxes, and a `Clear filter` button.
 For example, a search for `available` matches both `available` and
 `not available`. When a column has no active filter, its values start
-unchecked; select the values to keep and choose `Apply filter`.
+unchecked; select the values to keep, or use `Select all` / `Unselect all`,
+and choose `Apply filter`.
 
 Filtering is cosmetic: it only changes the rendered view and never changes the
 Markdown table.
