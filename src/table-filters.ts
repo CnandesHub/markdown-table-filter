@@ -33,6 +33,17 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
     const values = getColumnValues(body, columnIndex);
 
     const doc = table.ownerDocument;
+    const filterContainer = doc.createElement('span');
+    filterContainer.className = 'advanced-tables-filter-container';
+
+    const filterIcon = doc.createElement('span');
+    filterIcon.className = 'advanced-tables-filter-icon';
+    filterIcon.setAttribute('aria-hidden', 'true');
+    filterIcon.innerHTML =
+      '<svg viewBox="0 0 24 24">' +
+      '<path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"></path>' +
+      '</svg>';
+
     const filter = doc.createElement('select');
     filter.className = 'advanced-tables-filter';
     filter.setAttribute(
@@ -59,10 +70,15 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
         columnIndex,
         filter.value === ALL_VALUE ? null : values[selectedIndex],
       );
+      filterContainer.classList.toggle(
+        'advanced-tables-filter-active',
+        filter.value !== ALL_VALUE,
+      );
       applyFilters(body, filters);
     });
 
-    header.appendChild(filter);
+    filterContainer.append(filterIcon, filter);
+    header.appendChild(filterContainer);
   });
 };
 
