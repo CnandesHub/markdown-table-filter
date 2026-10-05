@@ -5,9 +5,13 @@ import {
   TableControlsViewType,
 } from './table-controls-view';
 import { TableEditor } from './table-editor';
-import { addTableFilters, refreshTableFilters } from './table-filters';
+import {
+  addTableFilters,
+  clearTableFilterVisuals,
+  refreshTableFilters,
+} from './table-filters';
 import { Extension, Prec } from '@codemirror/state';
-import * as CodeMirrorView from '@codemirror/view';
+import { KeyBinding, keymap, ViewPlugin } from '@codemirror/view';
 import { FormatType } from '@tgrosinger/md-advanced-tables';
 import {
   App,
@@ -49,29 +53,52 @@ export default class TableEditorPlugin extends Plugin {
     // CM6 editor extension for remapping keys
     this.registerEditorExtension(this.makeEditorExtension());
     this.registerEditorExtension(
-      CodeMirrorView.ViewPlugin.define((view) => {
-        let refreshQueued = false;
+      ViewPlugin.define((view) => {
+        let editingTable = false;
         const refresh = (): void => {
-          if (refreshQueued) {
+          if (editingTable) {
             return;
           }
-          refreshQueued = true;
           window.setTimeout(() => {
-            refreshQueued = false;
+            if (editingTable) {
+              return;
+            }
             addTableFilters(view.dom);
             refreshTableFilters(view.dom);
           }, 0);
         };
-        refresh();
 
+        const clearForEditing = (event: MouseEvent): void => {
+          const target = event.target;
+          const isTableCell =
+            target instanceof HTMLElement &&
+            target.closest('td, th') &&
+            !target.closest(
+              '.advanced-tables-filter-button, .advanced-tables-filter-menu',
+            );
+
+          if (isTableCell) {
+            editingTable = true;
+            clearTableFilterVisuals(view.dom);
+            return;
+          }
+
+          if (editingTable) {
+            editingTable = false;
+            refresh();
+          }
+        };
+
+        view.dom.addEventListener('mousedown', clearForEditing, true);
+        refresh();
         const observer = new MutationObserver(refresh);
-        observer.observe(view.dom, {
-          childList: true,
-          subtree: true,
-        });
+        observer.observe(view.dom, { childList: true, subtree: true });
 
         return {
-          destroy: () => observer.disconnect(),
+          destroy: () => {
+            observer.disconnect();
+            view.dom.removeEventListener('mousedown', clearForEditing, true);
+          },
         };
       }),
     );
@@ -301,7 +328,7 @@ export default class TableEditorPlugin extends Plugin {
 
   // makeEditorExtension is used to bind Tab and Enter in the new CM6 Live Preview editor.
   private readonly makeEditorExtension = (): Extension => {
-    const keymaps: CodeMirrorView.KeyBinding[] = [];
+    const keymaps: KeyBinding[] = [];
 
     if (this.settings.bindEnter) {
       keymaps.push({
@@ -325,7 +352,7 @@ export default class TableEditorPlugin extends Plugin {
       });
     }
 
-    return Prec.highest(CodeMirrorView.keymap.of(keymaps));
+    return Prec.highest(keymap.of(keymaps));
   };
 
   private readonly newPerformTableActionCM6 =

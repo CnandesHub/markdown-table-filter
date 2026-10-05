@@ -10,15 +10,27 @@ interface FilterControl {
   update: () => void;
 }
 
+const filterStateStores = new Map<string, Map<number, FilterState>>();
 const tableRefreshes = new WeakMap<HTMLTableElement, () => void>();
+const openTableMenus = new WeakMap<HTMLTableElement, () => void>();
 
 /**
  * Adds cosmetic, rendered-view filters to tables that have a header row.
  * Changes are limited to the rendered table DOM and never update Markdown.
  */
 export const addTableFilters = (container: HTMLElement): void => {
-  container.querySelectorAll('table').forEach((table) => {
-    addFiltersToTable(table);
+  Array.from(container.querySelectorAll('table')).forEach((table, index) => {
+    const tableKey = `${index}:${getTableHeadersKey(table)}`;
+    let tableStates = filterStateStores.get(tableKey);
+    if (!tableStates) {
+      tableStates = new Map();
+      filterStateStores.set(tableKey, tableStates);
+    }
+    if (tableRefreshes.has(table)) {
+      tableRefreshes.get(table)?.();
+      return;
+    }
+    addFiltersToTable(table, tableStates);
   });
 };
 
@@ -28,7 +40,30 @@ export const refreshTableFilters = (container: HTMLElement): void => {
   });
 };
 
-const addFiltersToTable = (table: HTMLTableElement): void => {
+export const clearTableFilterVisuals = (container: HTMLElement): void => {
+  container
+    .querySelectorAll('tr[data-advanced-tables-hidden="true"]')
+    .forEach((row) => {
+      if (!(row instanceof HTMLTableRowElement)) {
+        return;
+      }
+      row.removeAttribute('data-advanced-tables-hidden');
+      row.removeAttribute('aria-hidden');
+      row.removeAttribute('hidden');
+      row.classList.remove('advanced-tables-filtered-row');
+      row.style.display = '';
+    });
+};
+
+const getTableHeadersKey = (table: HTMLTableElement): string =>
+  Array.from(table.tHead?.rows[0]?.cells ?? [])
+    .map((cell) => getCellText(cell))
+    .join('|');
+
+const addFiltersToTable = (
+  table: HTMLTableElement,
+  savedStates: Map<number, FilterState>,
+): void => {
   const headerRow = table.tHead?.rows[0];
   const body = table.tBodies[0];
 
@@ -38,7 +73,9 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
 
   const states = new Map<number, FilterState>();
   const controls = new Map<number, FilterControl>();
-  const getRows = (): HTMLTableRowElement[] => Array.from(body.rows);
+  const getBody = (): HTMLTableSectionElement | undefined => table.tBodies[0];
+  const getRows = (): HTMLTableRowElement[] =>
+    Array.from(getBody()?.rows ?? []);
 
   Array.from(headerRow.cells).forEach((header, columnIndex) => {
     if (header.querySelector('.advanced-tables-filter-container')) {
@@ -47,7 +84,13 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
 
     const doc = table.ownerDocument;
     const headerName = getCellText(header) || `column ${columnIndex + 1}`;
-    const state: FilterState = { selectedValues: null, search: '' };
+    const savedState = savedStates.get(columnIndex);
+    const state: FilterState = {
+      selectedValues: savedState?.selectedValues
+        ? new Set(savedState.selectedValues)
+        : null,
+      search: savedState?.search ?? '',
+    };
     states.set(columnIndex, state);
     let pendingValues = new Set<string>();
 
@@ -154,9 +197,23 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
     apply.addEventListener('click', () => {
       state.selectedValues =
         pendingValues.size === 0 ? null : new Set(pendingValues);
-      applyFilters(body, states);
-      window.setTimeout(() => applyFilters(body, states), 0);
-      window.setTimeout(() => applyFilters(body, states), 100);
+      saveFilterState(savedStates, columnIndex, state);
+      const currentBody = getBody();
+      if (currentBody) {
+        applyFilters(currentBody, states);
+      }
+      window.setTimeout(() => {
+        const delayedBody = getBody();
+        if (delayedBody) {
+          applyFilters(delayedBody, states);
+        }
+      }, 0);
+      window.setTimeout(() => {
+        const delayedBody = getBody();
+        if (delayedBody) {
+          applyFilters(delayedBody, states);
+        }
+      }, 100);
       refreshControls(controls);
       menu.hidden = true;
       filterButton.setAttribute('aria-expanded', 'false');
@@ -168,16 +225,23 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
     clear.textContent = 'Clear filter';
     clear.addEventListener('click', () => {
       state.selectedValues = null;
+      saveFilterState(savedStates, columnIndex, state);
       pendingValues.clear();
       state.search = '';
       search.value = '';
-      applyFilters(body, states);
+      const currentBody = getBody();
+      if (currentBody) {
+        applyFilters(currentBody, states);
+      }
       refreshControls(controls);
     });
 
     search.addEventListener('input', () => {
       state.search = search.value;
-      applyFilters(body, states);
+      const currentBody = getBody();
+      if (currentBody) {
+        applyFilters(currentBody, states);
+      }
       updateValues();
       updateActiveState();
     });
@@ -193,18 +257,18 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
         controls.get(columnIndex)?.close();
         return;
       }
-      if (!isOpen) {
-        controls.forEach((control, controlColumnIndex) => {
-          if (controlColumnIndex !== columnIndex) {
-            control.close();
-          }
-        });
-      }
-      if (!isOpen) {
-        const buttonRect = filterButton.getBoundingClientRect();
-        menu.style.top = `${buttonRect.bottom + 4}px`;
-        menu.style.left = `${Math.max(8, buttonRect.right - 224)}px`;
-      }
+      openTableMenus.get(table)?.();
+      controls.forEach((control, controlColumnIndex) => {
+        if (controlColumnIndex !== columnIndex) {
+          control.close();
+        }
+      });
+      openTableMenus.set(table, () => {
+        controls.get(columnIndex)?.close();
+      });
+      const buttonRect = filterButton.getBoundingClientRect();
+      menu.style.top = `${buttonRect.bottom + 4}px`;
+      menu.style.left = `${Math.max(8, buttonRect.right - 224)}px`;
       menu.hidden = isOpen;
       filterButton.setAttribute('aria-expanded', String(!isOpen));
     });
@@ -231,11 +295,28 @@ const addFiltersToTable = (table: HTMLTableElement): void => {
     });
   });
 
+  applyFilters(body, states);
   tableRefreshes.set(table, () => {
-    applyFilters(body, states);
+    const currentBody = table.tBodies[0];
+    if (currentBody) {
+      applyFilters(currentBody, states);
+    }
     refreshControls(controls);
   });
   refreshControls(controls);
+};
+
+const saveFilterState = (
+  savedStates: Map<number, FilterState>,
+  columnIndex: number,
+  state: FilterState,
+): void => {
+  savedStates.set(columnIndex, {
+    selectedValues: state.selectedValues
+      ? new Set(state.selectedValues)
+      : null,
+    search: state.search,
+  });
 };
 
 const refreshControls = (controls: Map<number, FilterControl>): void => {
