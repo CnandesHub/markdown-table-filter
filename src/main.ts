@@ -7,7 +7,6 @@ import {
 import { TableEditor } from './table-editor';
 import {
   addTableFilters,
-  clearTableFilterVisuals,
   refreshTableFilters,
   setPinnedRow,
 } from './table-filters';
@@ -109,15 +108,52 @@ export default class TableEditorPlugin extends Plugin {
       ViewPlugin.define((view) => {
         const getScope = (): string =>
           view.state.field(editorInfoField, false)?.file?.path ?? '';
+        let refreshTimer: number | null = null;
+        let leaveEditingTimer: number | null = null;
 
         const refresh = (): void => {
-          window.setTimeout(() => {
+          if (refreshTimer !== null) {
+            window.clearTimeout(refreshTimer);
+          }
+          refreshTimer = window.setTimeout(() => {
+            refreshTimer = null;
             addTableFilters(view.dom, getScope());
             refreshTableFilters(view.dom);
           }, 0);
         };
 
+        const onMouseDown = (event: MouseEvent): void => {
+          if (leaveEditingTimer !== null) {
+            window.clearTimeout(leaveEditingTimer);
+            leaveEditingTimer = null;
+          }
+          const target = event.target;
+          if (!(target instanceof HTMLElement) || target.closest(
+            '.advanced-tables-filter-button, .advanced-tables-filter-menu',
+          )) {
+            return;
+          }
+          const cell = target.closest<HTMLTableCellElement>('td');
+          const table = cell?.closest('table');
+          if (!cell || !table) {
+            return;
+          }
+          const tables = Array.from(view.dom.querySelectorAll('table'));
+          const row = cell.parentElement;
+          if (!(row instanceof HTMLTableRowElement)) {
+            return;
+          }
+          setPinnedRow({
+            tableIndex: tables.indexOf(table),
+            rowIndex: row.sectionRowIndex,
+          });
+        };
+
           const onFocusIn = (event: FocusEvent): void => {
+            if (leaveEditingTimer !== null) {
+              window.clearTimeout(leaveEditingTimer);
+              leaveEditingTimer = null;
+            }
             const target = event.target;
             if (!(target instanceof HTMLElement)) return;
             const cell = target.closest<HTMLTableCellElement>('td');
@@ -129,12 +165,15 @@ export default class TableEditorPlugin extends Plugin {
               tableIndex: tables.indexOf(table),
               rowIndex: row.sectionRowIndex,
             });
-            clearTableFilterVisuals(view.dom);
           };
 
         const onFocusOut = (): void => {
-          window.setTimeout(() => {
-            const active = document.activeElement as HTMLElement | null;
+            if (leaveEditingTimer !== null) {
+              window.clearTimeout(leaveEditingTimer);
+            }
+            leaveEditingTimer = window.setTimeout(() => {
+              leaveEditingTimer = null;
+              const active = document.activeElement as HTMLElement | null;
             if (active && view.dom.contains(active) && active.closest('td')) {
               return; // foco continua numa célula; onFocusIn atualiza o pin
             }
@@ -143,6 +182,7 @@ export default class TableEditorPlugin extends Plugin {
           }, 0);
         };
 
+        view.dom.addEventListener('mousedown', onMouseDown, true);
         view.dom.addEventListener('focusin', onFocusIn, true);
         view.dom.addEventListener('focusout', onFocusOut, true);
         refresh();
@@ -152,6 +192,13 @@ export default class TableEditorPlugin extends Plugin {
         return {
           destroy: () => {
             observer.disconnect();
+            if (refreshTimer !== null) {
+              window.clearTimeout(refreshTimer);
+            }
+            if (leaveEditingTimer !== null) {
+              window.clearTimeout(leaveEditingTimer);
+            }
+            view.dom.removeEventListener('mousedown', onMouseDown, true);
             view.dom.removeEventListener('focusin', onFocusIn, true);
             view.dom.removeEventListener('focusout', onFocusOut, true);
             setPinnedRow(null);

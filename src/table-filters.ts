@@ -445,12 +445,11 @@ const applyFilters = (
   states: Map<number, FilterState>,
   pinnedRow: number | null,
 ): void => {
-  Array.from(body.rows).forEach((row) => {
-    const visible =
-      pinnedRow !== null ||
-      Array.from(states.entries()).every(([columnIndex, state]) =>
+  Array.from(body.rows).forEach((row, rowIndex) => {
+    const visible = Array.from(states.entries()).every(
+      ([columnIndex, state]) =>
         matchesState(state, getCellText(row.cells[columnIndex])),
-      );
+    ) || rowIndex === pinnedRow;
     row.style.display = visible ? '' : 'none';
     row.hidden = !visible;
     row.classList.toggle('advanced-tables-filtered-row', !visible);
