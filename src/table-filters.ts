@@ -13,6 +13,40 @@ interface FilterControl {
 const filterStateStores = new Map<string, Map<number, FilterState>>();
 const tableRefreshes = new WeakMap<HTMLTableElement, () => void>();
 const openTableMenus = new WeakMap<HTMLTableElement, () => void>();
+const storeInstances = new Map<string, Set<HTMLTableElement>>();
+
+const notifyStore = (key: string, except?: HTMLTableElement): void => {
+  const set = storeInstances.get(key);
+  if (!set) return;
+  set.forEach((t) => {
+    if (!t.isConnected) {
+      set.delete(t);
+      return;
+    }
+    if (t !== except) tableRefreshes.get(t)?.();
+  });
+};
+
+const isDecorated = (table: HTMLTableElement): boolean => {
+  const cells = table.tHead?.rows[0]?.cells;
+  if (!cells || cells.length === 0) return false;
+  return Array.from(cells).every((c) =>
+    c.querySelector('.advanced-tables-filter-container'),
+  );
+};
+
+const teardownTable = (table: HTMLTableElement): void => {
+  menuOwners.forEach((owner, menu) => {
+    if (owner === table) {
+      menu.remove();
+      menuOwners.delete(menu);
+    }
+  });
+  table
+    .querySelectorAll('.advanced-tables-filter-container')
+    .forEach((el) => el.remove());
+  tableRefreshes.delete(table);
+};
 
 let pin: { tableIndex: number; rowIndex: number } | null = null;
 
@@ -45,10 +79,13 @@ export const addTableFilters = (
       filterStateStores.set(tableKey, tableStates);
     }
     if (tableRefreshes.has(table)) {
-      tableRefreshes.get(table)?.();
-      return;
+      if (isDecorated(table)) {
+        tableRefreshes.get(table)?.();
+        return;
+      }
+      teardownTable(table); // header re-renderizado: recria os botões
     }
-    addFiltersToTable(table, tableStates, index);
+    addFiltersToTable(table, tableStates, index, tableKey);
   });
 };
 
@@ -80,8 +117,9 @@ const getTableHeadersKey = (table: HTMLTableElement): string =>
 
 const addFiltersToTable = (
   table: HTMLTableElement,
-  savedStates: Map<number, FilterState>,
-   tableIndex: number,
+  states: Map<number, FilterState>,   // agora é O estado compartilhado
+  tableIndex: number,
+  tableKey: string,
 ): void => {
   const headerRow = table.tHead?.rows[0];
   const body = table.tBodies[0];
@@ -90,7 +128,6 @@ const addFiltersToTable = (
     return;
   }
 
-  const states = new Map<number, FilterState>();
   const controls = new Map<number, FilterControl>();
   const getBody = (): HTMLTableSectionElement | undefined => table.tBodies[0];
   const getRows = (): HTMLTableRowElement[] =>
@@ -110,14 +147,9 @@ const addFiltersToTable = (
 
     const doc = table.ownerDocument;
     const headerName = getCellText(header) || `column ${columnIndex + 1}`;
-    const savedState = savedStates.get(columnIndex);
-    const state: FilterState = {
-      selectedValues: savedState?.selectedValues
-        ? new Set(savedState.selectedValues)
-        : null,
-      search: savedState?.search ?? '',
-    };
-    states.set(columnIndex, state);
+    const existing = states.get(columnIndex);
+    const state: FilterState = existing ?? { selectedValues: null, search: '' };
+    if (!existing) states.set(columnIndex, state);
     let pendingValues = new Set<string>();
 
     const filterContainer = doc.createElement('span');
@@ -147,6 +179,7 @@ const addFiltersToTable = (
     search.className = 'advanced-tables-filter-search';
     search.placeholder = 'Search values';
     search.setAttribute('aria-label', `Search ${headerName} values`);
+    search.value = state.search;
 
     const selectionActions = doc.createElement('div');
     selectionActions.className = 'advanced-tables-filter-selection-actions';
@@ -226,7 +259,7 @@ const addFiltersToTable = (
     apply.addEventListener('click', () => {
       state.selectedValues =
         pendingValues.size === 0 ? null : new Set(pendingValues);
-      saveFilterState(savedStates, columnIndex, state);
+      notifyStore(tableKey, table);
       const currentBody = getBody();
       if (currentBody) {
         runFilters(currentBody);
@@ -257,7 +290,7 @@ const addFiltersToTable = (
     pendingValues.clear();
     state.search = '';
     search.value = '';
-    saveFilterState(savedStates, columnIndex, state);   // <-- moved after the resets
+    notifyStore(tableKey, table);   // <-- moved after the resets
     const currentBody = getBody();
     if (currentBody) {
       runFilters(currentBody);
@@ -268,7 +301,7 @@ const addFiltersToTable = (
 
   search.addEventListener('input', () => {
     state.search = search.value;
-    saveFilterState(savedStates, columnIndex, state);   // <-- NEW
+    notifyStore(tableKey, table);   // <-- NEW
     const currentBody = getBody();
     if (currentBody) {
       runFilters(currentBody);
@@ -281,28 +314,48 @@ const addFiltersToTable = (
     filterContainer.appendChild(filterButton);
     header.appendChild(filterContainer);
 
-    filterButton.addEventListener('click', (event) => {
-      event.stopPropagation();
-      const isOpen = !menu.hidden;
-      if (isOpen) {
-        controls.get(columnIndex)?.close();
-        return;
-      }
-      openTableMenus.get(table)?.();
-      controls.forEach((control, controlColumnIndex) => {
-        if (controlColumnIndex !== columnIndex) {
-          control.close();
-        }
-      });
-      openTableMenus.set(table, () => {
-        controls.get(columnIndex)?.close();
-      });
-      const buttonRect = filterButton.getBoundingClientRect();
-      menu.style.top = `${buttonRect.bottom + 4}px`;
-      menu.style.left = `${Math.max(8, buttonRect.right - 224)}px`;
-      menu.hidden = isOpen;
-      filterButton.setAttribute('aria-expanded', String(!isOpen));
-    });
+const toggleMenu = (): void => {
+  const isOpen = !menu.hidden;
+  if (isOpen) {
+    controls.get(columnIndex)?.close();
+    return;
+  }
+  openTableMenus.get(table)?.();
+  controls.forEach((control, controlColumnIndex) => {
+    if (controlColumnIndex !== columnIndex) {
+      control.close();
+    }
+  });
+  openTableMenus.set(table, () => {
+    controls.get(columnIndex)?.close();
+  });
+  const buttonRect = filterButton.getBoundingClientRect();
+  menu.style.top = `${buttonRect.bottom + 4}px`;
+  menu.style.left = `${Math.max(8, buttonRect.right - 224)}px`;
+  menu.hidden = false;
+  filterButton.setAttribute('aria-expanded', 'true');
+};
+
+// Impede que o editor trate eventos do botão (foco, seleção, re-render)
+['pointerdown', 'mouseup', 'dblclick', 'touchstart'].forEach((type) =>
+  filterContainer.addEventListener(type, (e) => e.stopPropagation()),
+);
+
+// Abre no mousedown: não depende do click chegar ao mesmo elemento
+filterButton.addEventListener('mousedown', (event) => {
+  event.preventDefault();    // não tira o foco da célula
+  event.stopPropagation();   // CodeMirror/Obsidian não veem o clique
+  toggleMenu();
+});
+
+// click só para ativação por teclado (Enter/Espaço têm detail === 0)
+filterButton.addEventListener('click', (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  if (event.detail === 0) {
+    toggleMenu();
+  }
+});
 
     controls.set(columnIndex, {
       container: filterContainer,
@@ -320,6 +373,7 @@ const addFiltersToTable = (
           state.selectedValues === null
             ? new Set<string>()
             : new Set(state.selectedValues);
+        search.value = state.search;
         updateValues();
         updateActiveState();
       },
@@ -334,6 +388,12 @@ const addFiltersToTable = (
     }
     refreshControls(controls);
   });
+  let set = storeInstances.get(tableKey);
+  if (!set) {
+    set = new Set();
+    storeInstances.set(tableKey, set);
+  }
+  set.add(table);
   refreshControls(controls);
 };
 
@@ -387,7 +447,7 @@ const applyFilters = (
 ): void => {
   Array.from(body.rows).forEach((row, rowIdx) => {
     const visible =
-      pinnedRow !== null ||
+      rowIdx === pinnedRow ||
       Array.from(states.entries()).every(([columnIndex, state]) =>
         matchesState(state, getCellText(row.cells[columnIndex])),
       );

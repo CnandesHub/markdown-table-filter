@@ -117,21 +117,19 @@ export default class TableEditorPlugin extends Plugin {
           }, 0);
         };
 
-        const onFocusIn = (event: FocusEvent): void => {
-          const target = event.target;
-          if (!(target instanceof HTMLElement)) return;
-          const cell = target.closest<HTMLTableCellElement>('td');
-          const table = cell?.closest('table');
-          if (!cell || !table) return;
-          const tables = Array.from(view.dom.querySelectorAll('table'));
-          const row = cell.parentElement as HTMLTableRowElement;
-          setPinnedRow({
-            tableIndex: tables.indexOf(table),
-            rowIndex: row.sectionRowIndex,
-          });
-          clearTableFilterVisuals(view.dom);
-          refresh();
-        };
+          const onFocusIn = (event: FocusEvent): void => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) return;
+            const cell = target.closest('td') as HTMLTableCellElement | null;
+            const table = cell?.closest('table');
+            if (!cell || !table) return;
+            const tables = Array.from(view.dom.querySelectorAll('table'));
+            const row = cell.parentElement as HTMLTableRowElement;
+            setPinnedRow({
+              tableIndex: tables.indexOf(table),
+              rowIndex: row.sectionRowIndex,
+            });
+          };
 
         const onFocusOut = (): void => {
           window.setTimeout(() => {
