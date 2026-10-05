@@ -79,21 +79,7 @@ export default class TableEditorPlugin extends Plugin {
 
           if (isTableCell) {
             editingTable = true;
-            const cursorPosition = view.posAtCoords({
-              x: event.clientX,
-              y: event.clientY,
-            });
             clearTableFilterVisuals(view.dom);
-            if (cursorPosition !== null) {
-              window.requestAnimationFrame(() => {
-                view.focus();
-                view.dispatch({
-                  selection: {
-                    anchor: cursorPosition,
-                  },
-                });
-              });
-            }
             return;
           }
 
