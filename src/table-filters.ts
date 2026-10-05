@@ -445,9 +445,9 @@ const applyFilters = (
   states: Map<number, FilterState>,
   pinnedRow: number | null,
 ): void => {
-  Array.from(body.rows).forEach((row, rowIdx) => {
+  Array.from(body.rows).forEach((row) => {
     const visible =
-      rowIdx === pinnedRow ||
+      pinnedRow !== null ||
       Array.from(states.entries()).every(([columnIndex, state]) =>
         matchesState(state, getCellText(row.cells[columnIndex])),
       );
