@@ -24,6 +24,59 @@ import {
   Setting,
 } from 'obsidian';
 
+type SavedCaret = { node: Node; offset: number } | null;
+
+const FILTER_UI =
+  '.advanced-tables-filter-button, .advanced-tables-filter-menu';
+
+const caretFromPoint = (x: number, y: number): SavedCaret => {
+  const d = document as Document & {
+    caretPositionFromPoint?: (
+      x: number,
+      y: number,
+    ) => { offsetNode: Node; offset: number } | null;
+    caretRangeFromPoint?: (x: number, y: number) => Range | null;
+  };
+  if (d.caretPositionFromPoint) {
+    const p = d.caretPositionFromPoint(x, y);
+    return p ? { node: p.offsetNode, offset: p.offset } : null;
+  }
+  const r = d.caretRangeFromPoint?.(x, y);
+  return r ? { node: r.startContainer, offset: r.startOffset } : null;
+};
+
+const placeCaret = (cell: HTMLElement, saved: SavedCaret): void => {
+  cell.focus();
+  const sel = window.getSelection();
+  if (!sel) return;
+  const range = document.createRange();
+  if (saved && saved.node.isConnected && cell.contains(saved.node)) {
+    const max =
+      saved.node.nodeType === Node.TEXT_NODE
+        ? (saved.node.textContent?.length ?? 0)
+        : saved.node.childNodes.length;
+    range.setStart(saved.node, Math.min(saved.offset, max));
+    range.collapse(true);
+  } else {
+    range.selectNodeContents(cell);
+    range.collapse(false); // fim da célula
+  }
+  sel.removeAllRanges();
+  sel.addRange(range);
+};
+
+const findCell = (
+  root: HTMLElement,
+  t: number,
+  r: number,
+  c: number,
+): HTMLElement | null => {
+  const table = root.querySelectorAll('table')[t] as
+    | HTMLTableElement
+    | undefined;
+  return (table?.rows[r]?.cells[c] as HTMLElement | undefined) ?? null;
+};
+
 export default class TableEditorPlugin extends Plugin {
   public settings: TableEditorPluginSettings;
 
@@ -52,56 +105,92 @@ export default class TableEditorPlugin extends Plugin {
 
     // CM6 editor extension for remapping keys
     this.registerEditorExtension(this.makeEditorExtension());
-    this.registerEditorExtension(
-      ViewPlugin.define((view) => {
-        let editingTable = false;
-        const refresh = (): void => {
-          if (editingTable) {
-            return;
-          }
-          window.setTimeout(() => {
-            if (editingTable) {
-              return;
-            }
-            addTableFilters(view.dom);
-            refreshTableFilters(view.dom);
-          }, 0);
-        };
+this.registerEditorExtension(
+  ViewPlugin.define((view) => {
+    let editingTable = false;
 
-        const clearForEditing = (event: MouseEvent): void => {
-          const target = event.target;
-          const isTableCell =
-            target instanceof HTMLElement &&
-            target.closest('td, th') &&
-            !target.closest(
-              '.advanced-tables-filter-button, .advanced-tables-filter-menu',
-            );
+    const refresh = (): void => {
+      if (editingTable) return;
+      window.setTimeout(() => {
+        if (editingTable) return;
+        addTableFilters(view.dom);
+        refreshTableFilters(view.dom);
+      }, 0);
+    };
 
-          if (isTableCell) {
-            editingTable = true;
-            clearTableFilterVisuals(view.dom);
-            return;
-          }
+    // (1) leaveEditing: remove a classe e reaplica os filtros
+    const leaveEditing = (): void => {
+      if (!editingTable) return;
+      editingTable = false;
+      view.dom.classList.remove('advanced-tables-editing'); // <-- NOVO
+      refresh();
+    };
 
-          if (editingTable) {
-            editingTable = false;
-            refresh();
-          }
-        };
+    const onMouseDown = (event: MouseEvent): void => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (target.closest(FILTER_UI)) return;
 
-        view.dom.addEventListener('mousedown', clearForEditing, true);
-        refresh();
-        const observer = new MutationObserver(refresh);
-        observer.observe(view.dom, { childList: true, subtree: true });
+      const cell = target.closest('td, th') as HTMLTableCellElement | null;
+      if (!cell) { leaveEditing(); return; }
 
-        return {
-          destroy: () => {
-            observer.disconnect();
-            view.dom.removeEventListener('mousedown', clearForEditing, true);
-          },
-        };
-      }),
-    );
+      if (editingTable) return;
+
+      const table = cell.closest('table');
+      if (!table) return;
+      const tables = Array.from(view.dom.querySelectorAll('table'));
+      const t = tables.indexOf(table);
+      const r = (cell.parentElement as HTMLTableRowElement).rowIndex;
+      const c = cell.cellIndex;
+      const saved = caretFromPoint(event.clientX, event.clientY);
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      // (2) onMouseDown: adiciona a classe ANTES de limpar os filtros
+      editingTable = true;
+      view.dom.classList.add('advanced-tables-editing');   // <-- NOVO
+      clearTableFilterVisuals(view.dom);
+
+      const focusTarget = (attempt: number): void => {
+        const fresh = findCell(view.dom, t, r, c);
+        if (fresh) {
+          placeCaret(fresh, saved);
+          if (fresh.contains(document.activeElement) || attempt >= 3) return;
+        } else if (attempt >= 3) return;
+        window.setTimeout(() => focusTarget(attempt + 1), 30);
+      };
+      requestAnimationFrame(() => focusTarget(0));
+    };
+
+    const onFocusOut = (e: FocusEvent): void => {
+      const next = e.relatedTarget as HTMLElement | null;
+      if (next && next.closest('td, th')) return;
+      window.setTimeout(() => {
+        const active = document.activeElement as HTMLElement | null;
+        if (!active || !view.dom.contains(active) || !active.closest('td, th')) {
+          leaveEditing();
+        }
+      }, 0);
+    };
+
+    view.dom.addEventListener('mousedown', onMouseDown, true);
+    view.dom.addEventListener('focusout', onFocusOut, true);
+    refresh();
+    const observer = new MutationObserver(refresh);
+    observer.observe(view.dom, { childList: true, subtree: true });
+
+    return {
+      // (3) destroy: remove a classe junto com os listeners
+      destroy: () => {
+        observer.disconnect();
+        view.dom.removeEventListener('mousedown', onMouseDown, true);
+        view.dom.removeEventListener('focusout', onFocusOut, true);
+        view.dom.classList.remove('advanced-tables-editing'); // <-- NOVO
+      },
+    };
+  }),
+);
 
     this.addCommand({
       id: 'next-row',

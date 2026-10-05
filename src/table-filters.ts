@@ -18,7 +18,14 @@ const openTableMenus = new WeakMap<HTMLTableElement, () => void>();
  * Adds cosmetic, rendered-view filters to tables that have a header row.
  * Changes are limited to the rendered table DOM and never update Markdown.
  */
+const menuOwners = new Map<HTMLDivElement, HTMLTableElement>();
 export const addTableFilters = (container: HTMLElement): void => {
+    menuOwners.forEach((owner, menu) => {
+    if (!owner.isConnected) {
+      menu.remove();
+      menuOwners.delete(menu);
+    }
+  });
   Array.from(container.querySelectorAll('table')).forEach((table, index) => {
     const tableKey = `${index}:${getTableHeadersKey(table)}`;
     let tableStates = filterStateStores.get(tableKey);
@@ -96,7 +103,9 @@ const addFiltersToTable = (
 
     const filterContainer = doc.createElement('span');
     filterContainer.className = 'advanced-tables-filter-container';
-
+    filterContainer.contentEditable = 'false';
+    filterContainer.setAttribute('data-cm-ignore', 'true'); // inofensivo se não usado
+    
     const filterButton = doc.createElement('button');
     filterButton.type = 'button';
     filterButton.className = 'advanced-tables-filter-button';
@@ -111,6 +120,7 @@ const addFiltersToTable = (
     menu.className = 'advanced-tables-filter-menu';
     menu.hidden = true;
     doc.body.appendChild(menu);
+    menuOwners.set(menu, table);
     menu.addEventListener('click', (event) => event.stopPropagation());
 
     const search = doc.createElement('input');
