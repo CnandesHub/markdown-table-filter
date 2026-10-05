@@ -60,7 +60,7 @@ export const refreshTableFilters = (container: HTMLElement): void => {
 
 export const clearTableFilterVisuals = (container: HTMLElement): void => {
   container
-    .querySelectorAll('tr[data-advanced-tables-hidden="true"]')
+    .querySelectorAll('table tbody tr')
     .forEach((row) => {
       if (!(row instanceof HTMLTableRowElement)) {
         return;
@@ -387,7 +387,7 @@ const applyFilters = (
 ): void => {
   Array.from(body.rows).forEach((row, rowIdx) => {
     const visible =
-      rowIdx === pinnedRow ||
+      pinnedRow !== null ||
       Array.from(states.entries()).every(([columnIndex, state]) =>
         matchesState(state, getCellText(row.cells[columnIndex])),
       );

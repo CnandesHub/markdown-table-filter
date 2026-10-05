@@ -7,6 +7,7 @@ import {
 import { TableEditor } from './table-editor';
 import {
   addTableFilters,
+  clearTableFilterVisuals,
   refreshTableFilters,
   setPinnedRow,
 } from './table-filters';
@@ -72,10 +73,8 @@ const findCell = (
   r: number,
   c: number,
 ): HTMLElement | null => {
-  const table = root.querySelectorAll('table')[t] as
-    | HTMLTableElement
-    | undefined;
-  return (table?.rows[r]?.cells[c] as HTMLElement | undefined) ?? null;
+  const table = root.querySelectorAll<HTMLTableElement>('table')[t];
+  return table?.rows[r]?.cells[c] ?? null;
 };
 // addFiltersToTable
 export default class TableEditorPlugin extends Plugin {
@@ -121,7 +120,7 @@ export default class TableEditorPlugin extends Plugin {
         const onFocusIn = (event: FocusEvent): void => {
           const target = event.target;
           if (!(target instanceof HTMLElement)) return;
-          const cell = target.closest('td') as HTMLTableCellElement | null;
+          const cell = target.closest<HTMLTableCellElement>('td');
           const table = cell?.closest('table');
           if (!cell || !table) return;
           const tables = Array.from(view.dom.querySelectorAll('table'));
@@ -130,6 +129,8 @@ export default class TableEditorPlugin extends Plugin {
             tableIndex: tables.indexOf(table),
             rowIndex: row.sectionRowIndex,
           });
+          clearTableFilterVisuals(view.dom);
+          refresh();
         };
 
         const onFocusOut = (): void => {
