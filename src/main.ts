@@ -7,8 +7,8 @@ import {
 import { TableEditor } from './table-editor';
 import {
   addTableFilters,
-  clearTableFilterVisuals,
   refreshTableFilters,
+  setPinnedRow,
 } from './table-filters';
 import { Extension, Prec } from '@codemirror/state';
 import { KeyBinding, keymap, ViewPlugin } from '@codemirror/view';
@@ -16,6 +16,7 @@ import { FormatType } from '@tgrosinger/md-advanced-tables';
 import {
   App,
   Editor,
+  editorInfoField,
   MarkdownView,
   Notice,
   Platform,
@@ -76,7 +77,7 @@ const findCell = (
     | undefined;
   return (table?.rows[r]?.cells[c] as HTMLElement | undefined) ?? null;
 };
-
+// addFiltersToTable
 export default class TableEditorPlugin extends Plugin {
   public settings: TableEditorPluginSettings;
 
@@ -93,8 +94,8 @@ export default class TableEditorPlugin extends Plugin {
     );
 
     addIcons();
-    this.registerMarkdownPostProcessor((element) => {
-      addTableFilters(element);
+    this.registerMarkdownPostProcessor((element, ctx) => {
+      addTableFilters(element, ctx.sourcePath);
     });
 
     if (this.settings.showRibbonIcon) {
@@ -105,92 +106,59 @@ export default class TableEditorPlugin extends Plugin {
 
     // CM6 editor extension for remapping keys
     this.registerEditorExtension(this.makeEditorExtension());
-this.registerEditorExtension(
-  ViewPlugin.define((view) => {
-    let editingTable = false;
+    this.registerEditorExtension(
+      ViewPlugin.define((view) => {
+        const getScope = (): string =>
+          view.state.field(editorInfoField, false)?.file?.path ?? '';
 
-    const refresh = (): void => {
-      if (editingTable) return;
-      window.setTimeout(() => {
-        if (editingTable) return;
-        addTableFilters(view.dom);
-        refreshTableFilters(view.dom);
-      }, 0);
-    };
+        const refresh = (): void => {
+          window.setTimeout(() => {
+            addTableFilters(view.dom, getScope());
+            refreshTableFilters(view.dom);
+          }, 0);
+        };
 
-    // (1) leaveEditing: remove a classe e reaplica os filtros
-    const leaveEditing = (): void => {
-      if (!editingTable) return;
-      editingTable = false;
-      view.dom.classList.remove('advanced-tables-editing'); // <-- NOVO
-      refresh();
-    };
+        const onFocusIn = (event: FocusEvent): void => {
+          const target = event.target;
+          if (!(target instanceof HTMLElement)) return;
+          const cell = target.closest('td') as HTMLTableCellElement | null;
+          const table = cell?.closest('table');
+          if (!cell || !table) return;
+          const tables = Array.from(view.dom.querySelectorAll('table'));
+          const row = cell.parentElement as HTMLTableRowElement;
+          setPinnedRow({
+            tableIndex: tables.indexOf(table),
+            rowIndex: row.sectionRowIndex,
+          });
+        };
 
-    const onMouseDown = (event: MouseEvent): void => {
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) return;
-      if (target.closest(FILTER_UI)) return;
+        const onFocusOut = (): void => {
+          window.setTimeout(() => {
+            const active = document.activeElement as HTMLElement | null;
+            if (active && view.dom.contains(active) && active.closest('td')) {
+              return; // foco continua numa célula; onFocusIn atualiza o pin
+            }
+            setPinnedRow(null);
+            refresh();
+          }, 0);
+        };
 
-      const cell = target.closest('td, th') as HTMLTableCellElement | null;
-      if (!cell) { leaveEditing(); return; }
+        view.dom.addEventListener('focusin', onFocusIn, true);
+        view.dom.addEventListener('focusout', onFocusOut, true);
+        refresh();
+        const observer = new MutationObserver(refresh);
+        observer.observe(view.dom, { childList: true, subtree: true });
 
-      if (editingTable) return;
-
-      const table = cell.closest('table');
-      if (!table) return;
-      const tables = Array.from(view.dom.querySelectorAll('table'));
-      const t = tables.indexOf(table);
-      const r = (cell.parentElement as HTMLTableRowElement).rowIndex;
-      const c = cell.cellIndex;
-      const saved = caretFromPoint(event.clientX, event.clientY);
-
-      event.preventDefault();
-      event.stopPropagation();
-
-      // (2) onMouseDown: adiciona a classe ANTES de limpar os filtros
-      editingTable = true;
-      view.dom.classList.add('advanced-tables-editing');   // <-- NOVO
-      clearTableFilterVisuals(view.dom);
-
-      const focusTarget = (attempt: number): void => {
-        const fresh = findCell(view.dom, t, r, c);
-        if (fresh) {
-          placeCaret(fresh, saved);
-          if (fresh.contains(document.activeElement) || attempt >= 3) return;
-        } else if (attempt >= 3) return;
-        window.setTimeout(() => focusTarget(attempt + 1), 30);
-      };
-      requestAnimationFrame(() => focusTarget(0));
-    };
-
-    const onFocusOut = (e: FocusEvent): void => {
-      const next = e.relatedTarget as HTMLElement | null;
-      if (next && next.closest('td, th')) return;
-      window.setTimeout(() => {
-        const active = document.activeElement as HTMLElement | null;
-        if (!active || !view.dom.contains(active) || !active.closest('td, th')) {
-          leaveEditing();
-        }
-      }, 0);
-    };
-
-    view.dom.addEventListener('mousedown', onMouseDown, true);
-    view.dom.addEventListener('focusout', onFocusOut, true);
-    refresh();
-    const observer = new MutationObserver(refresh);
-    observer.observe(view.dom, { childList: true, subtree: true });
-
-    return {
-      // (3) destroy: remove a classe junto com os listeners
-      destroy: () => {
-        observer.disconnect();
-        view.dom.removeEventListener('mousedown', onMouseDown, true);
-        view.dom.removeEventListener('focusout', onFocusOut, true);
-        view.dom.classList.remove('advanced-tables-editing'); // <-- NOVO
-      },
-    };
-  }),
-);
+        return {
+          destroy: () => {
+            observer.disconnect();
+            view.dom.removeEventListener('focusin', onFocusIn, true);
+            view.dom.removeEventListener('focusout', onFocusOut, true);
+            setPinnedRow(null);
+          },
+        };
+      }),
+    );
 
     this.addCommand({
       id: 'next-row',

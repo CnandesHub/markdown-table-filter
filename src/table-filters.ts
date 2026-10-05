@@ -14,20 +14,31 @@ const filterStateStores = new Map<string, Map<number, FilterState>>();
 const tableRefreshes = new WeakMap<HTMLTableElement, () => void>();
 const openTableMenus = new WeakMap<HTMLTableElement, () => void>();
 
+let pin: { tableIndex: number; rowIndex: number } | null = null;
+
+export const setPinnedRow = (
+  value: { tableIndex: number; rowIndex: number } | null,
+): void => {
+  pin = value;
+};
+
 /**
  * Adds cosmetic, rendered-view filters to tables that have a header row.
  * Changes are limited to the rendered table DOM and never update Markdown.
  */
 const menuOwners = new Map<HTMLDivElement, HTMLTableElement>();
-export const addTableFilters = (container: HTMLElement): void => {
-    menuOwners.forEach((owner, menu) => {
+export const addTableFilters = (
+  container: HTMLElement,
+  scope: string,
+): void => {
+  menuOwners.forEach((owner, menu) => {
     if (!owner.isConnected) {
       menu.remove();
       menuOwners.delete(menu);
     }
   });
   Array.from(container.querySelectorAll('table')).forEach((table, index) => {
-    const tableKey = `${index}:${getTableHeadersKey(table)}`;
+    const tableKey = `${scope}::${getTableHeadersKey(table)}`;
     let tableStates = filterStateStores.get(tableKey);
     if (!tableStates) {
       tableStates = new Map();
@@ -37,7 +48,7 @@ export const addTableFilters = (container: HTMLElement): void => {
       tableRefreshes.get(table)?.();
       return;
     }
-    addFiltersToTable(table, tableStates);
+    addFiltersToTable(table, tableStates, index);
   });
 };
 
@@ -70,6 +81,7 @@ const getTableHeadersKey = (table: HTMLTableElement): string =>
 const addFiltersToTable = (
   table: HTMLTableElement,
   savedStates: Map<number, FilterState>,
+   tableIndex: number,
 ): void => {
   const headerRow = table.tHead?.rows[0];
   const body = table.tBodies[0];
@@ -83,6 +95,13 @@ const addFiltersToTable = (
   const getBody = (): HTMLTableSectionElement | undefined => table.tBodies[0];
   const getRows = (): HTMLTableRowElement[] =>
     Array.from(getBody()?.rows ?? []);
+  
+  const runFilters = (b: HTMLTableSectionElement): void =>
+  applyFilters(
+    b,
+    states,
+    pin && pin.tableIndex === tableIndex ? pin.rowIndex : null,
+  );
 
   Array.from(headerRow.cells).forEach((header, columnIndex) => {
     if (header.querySelector('.advanced-tables-filter-container')) {
@@ -210,18 +229,18 @@ const addFiltersToTable = (
       saveFilterState(savedStates, columnIndex, state);
       const currentBody = getBody();
       if (currentBody) {
-        applyFilters(currentBody, states);
+        runFilters(currentBody);
       }
       window.setTimeout(() => {
         const delayedBody = getBody();
         if (delayedBody) {
-          applyFilters(delayedBody, states);
+          runFilters(delayedBody);
         }
       }, 0);
       window.setTimeout(() => {
         const delayedBody = getBody();
         if (delayedBody) {
-          applyFilters(delayedBody, states);
+          runFilters(delayedBody);
         }
       }, 100);
       refreshControls(controls);
@@ -234,27 +253,29 @@ const addFiltersToTable = (
     clear.className = 'advanced-tables-filter-clear';
     clear.textContent = 'Clear filter';
     clear.addEventListener('click', () => {
-      state.selectedValues = null;
-      saveFilterState(savedStates, columnIndex, state);
-      pendingValues.clear();
-      state.search = '';
-      search.value = '';
-      const currentBody = getBody();
-      if (currentBody) {
-        applyFilters(currentBody, states);
-      }
-      refreshControls(controls);
-    });
+    state.selectedValues = null;
+    pendingValues.clear();
+    state.search = '';
+    search.value = '';
+    saveFilterState(savedStates, columnIndex, state);   // <-- moved after the resets
+    const currentBody = getBody();
+    if (currentBody) {
+      runFilters(currentBody);
+    }
+    refreshControls(controls);
+  });
 
-    search.addEventListener('input', () => {
-      state.search = search.value;
-      const currentBody = getBody();
-      if (currentBody) {
-        applyFilters(currentBody, states);
-      }
-      updateValues();
-      updateActiveState();
-    });
+
+  search.addEventListener('input', () => {
+    state.search = search.value;
+    saveFilterState(savedStates, columnIndex, state);   // <-- NEW
+    const currentBody = getBody();
+    if (currentBody) {
+      runFilters(currentBody);
+    }
+    updateValues();
+    updateActiveState();
+  });
 
     menu.append(search, selectionActions, valuesList, apply, clear);
     filterContainer.appendChild(filterButton);
@@ -305,11 +326,11 @@ const addFiltersToTable = (
     });
   });
 
-  applyFilters(body, states);
+  runFilters(body);
   tableRefreshes.set(table, () => {
     const currentBody = table.tBodies[0];
     if (currentBody) {
-      applyFilters(currentBody, states);
+      runFilters(currentBody);
     }
     refreshControls(controls);
   });
@@ -362,12 +383,14 @@ const getCellText = (cell: HTMLTableCellElement | undefined): string =>
 const applyFilters = (
   body: HTMLTableSectionElement,
   states: Map<number, FilterState>,
+  pinnedRow: number | null,
 ): void => {
-  Array.from(body.rows).forEach((row) => {
-    const visible = Array.from(states.entries()).every(
-      ([columnIndex, state]) =>
+  Array.from(body.rows).forEach((row, rowIdx) => {
+    const visible =
+      rowIdx === pinnedRow ||
+      Array.from(states.entries()).every(([columnIndex, state]) =>
         matchesState(state, getCellText(row.cells[columnIndex])),
-    );
+      );
     row.style.display = visible ? '' : 'none';
     row.hidden = !visible;
     row.classList.toggle('advanced-tables-filtered-row', !visible);

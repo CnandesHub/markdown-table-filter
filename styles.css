@@ -206,7 +206,3 @@ tr[data-advanced-tables-hidden="true"] {
 .advanced-tables-donate-button {
   margin: 10px;
 }
-
-.advanced-tables-editing .advanced-tables-filter-container {
-  display: none;
-}
