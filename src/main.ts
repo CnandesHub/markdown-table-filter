@@ -8,7 +8,6 @@ import { TableEditor } from './table-editor';
 import {
   addTableFilters,
   refreshTableFilters,
-  setPinnedRow,
 } from './table-filters';
 import { Extension, Prec } from '@codemirror/state';
 import { KeyBinding, keymap, ViewPlugin } from '@codemirror/view';
@@ -122,50 +121,19 @@ export default class TableEditorPlugin extends Plugin {
           }, 0);
         };
 
-        const onMouseDown = (event: MouseEvent): void => {
+        const onMouseDown = (): void => {
           if (leaveEditingTimer !== null) {
             window.clearTimeout(leaveEditingTimer);
             leaveEditingTimer = null;
           }
-          const target = event.target;
-          if (!(target instanceof HTMLElement) || target.closest(
-            '.advanced-tables-filter-button, .advanced-tables-filter-menu',
-          )) {
-            return;
-          }
-          const cell = target.closest<HTMLTableCellElement>('td');
-          const table = cell?.closest('table');
-          if (!cell || !table) {
-            return;
-          }
-          const tables = Array.from(view.dom.querySelectorAll('table'));
-          const row = cell.parentElement;
-          if (!(row instanceof HTMLTableRowElement)) {
-            return;
-          }
-          setPinnedRow({
-            tableIndex: tables.indexOf(table),
-            rowIndex: row.sectionRowIndex,
-          });
         };
 
-          const onFocusIn = (event: FocusEvent): void => {
+        const onFocusIn = (): void => {
             if (leaveEditingTimer !== null) {
               window.clearTimeout(leaveEditingTimer);
               leaveEditingTimer = null;
             }
-            const target = event.target;
-            if (!(target instanceof HTMLElement)) return;
-            const cell = target.closest<HTMLTableCellElement>('td');
-            const table = cell?.closest('table');
-            if (!cell || !table) return;
-            const tables = Array.from(view.dom.querySelectorAll('table'));
-            const row = cell.parentElement as HTMLTableRowElement;
-            setPinnedRow({
-              tableIndex: tables.indexOf(table),
-              rowIndex: row.sectionRowIndex,
-            });
-          };
+        };
 
         const onFocusOut = (): void => {
             if (leaveEditingTimer !== null) {
@@ -175,9 +143,8 @@ export default class TableEditorPlugin extends Plugin {
               leaveEditingTimer = null;
               const active = document.activeElement as HTMLElement | null;
             if (active && view.dom.contains(active) && active.closest('td')) {
-              return; // foco continua numa célula; onFocusIn atualiza o pin
+              return;
             }
-            setPinnedRow(null);
             refresh();
           }, 0);
         };
@@ -201,7 +168,6 @@ export default class TableEditorPlugin extends Plugin {
             view.dom.removeEventListener('mousedown', onMouseDown, true);
             view.dom.removeEventListener('focusin', onFocusIn, true);
             view.dom.removeEventListener('focusout', onFocusOut, true);
-            setPinnedRow(null);
           },
         };
       }),

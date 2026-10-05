@@ -48,14 +48,6 @@ const teardownTable = (table: HTMLTableElement): void => {
   tableRefreshes.delete(table);
 };
 
-let pin: { tableIndex: number; rowIndex: number } | null = null;
-
-export const setPinnedRow = (
-  value: { tableIndex: number; rowIndex: number } | null,
-): void => {
-  pin = value;
-};
-
 /**
  * Adds cosmetic, rendered-view filters to tables that have a header row.
  * Changes are limited to the rendered table DOM and never update Markdown.
@@ -71,7 +63,7 @@ export const addTableFilters = (
       menuOwners.delete(menu);
     }
   });
-  Array.from(container.querySelectorAll('table')).forEach((table, index) => {
+  Array.from(container.querySelectorAll('table')).forEach((table) => {
     const tableKey = `${scope}::${getTableHeadersKey(table)}`;
     let tableStates = filterStateStores.get(tableKey);
     if (!tableStates) {
@@ -85,7 +77,7 @@ export const addTableFilters = (
       }
       teardownTable(table); // header re-renderizado: recria os botões
     }
-    addFiltersToTable(table, tableStates, index, tableKey);
+    addFiltersToTable(table, tableStates, tableKey);
   });
 };
 
@@ -118,7 +110,6 @@ const getTableHeadersKey = (table: HTMLTableElement): string =>
 const addFiltersToTable = (
   table: HTMLTableElement,
   states: Map<number, FilterState>,   // agora é O estado compartilhado
-  tableIndex: number,
   tableKey: string,
 ): void => {
   const headerRow = table.tHead?.rows[0];
@@ -134,11 +125,7 @@ const addFiltersToTable = (
     Array.from(getBody()?.rows ?? []);
   
   const runFilters = (b: HTMLTableSectionElement): void =>
-  applyFilters(
-    b,
-    states,
-    pin && pin.tableIndex === tableIndex ? pin.rowIndex : null,
-  );
+    applyFilters(b, states);
 
   Array.from(headerRow.cells).forEach((header, columnIndex) => {
     if (header.querySelector('.advanced-tables-filter-container')) {
@@ -437,19 +424,31 @@ const getAvailableValues = (
   );
 };
 
-const getCellText = (cell: HTMLTableCellElement | undefined): string =>
-  cell?.textContent?.trim() ?? '';
+const getCellText = (cell: HTMLTableCellElement | undefined): string => {
+  if (!cell) {
+    return '';
+  }
+  const clone = cell.cloneNode(true);
+  if (!(clone instanceof HTMLTableCellElement)) {
+    return '';
+  }
+  clone
+    .querySelectorAll(
+      '.advanced-tables-filter-container, .advanced-tables-filter-menu',
+    )
+    .forEach((element) => element.remove());
+  return (clone.innerText || clone.textContent || '').trim();
+};
 
 const applyFilters = (
   body: HTMLTableSectionElement,
   states: Map<number, FilterState>,
-  pinnedRow: number | null,
 ): void => {
-  Array.from(body.rows).forEach((row, rowIndex) => {
+  Array.from(body.rows).forEach((row) => {
     const visible = Array.from(states.entries()).every(
       ([columnIndex, state]) =>
         matchesState(state, getCellText(row.cells[columnIndex])),
-    ) || rowIndex === pinnedRow;
+    );
     row.style.display = visible ? '' : 'none';
     row.hidden = !visible;
     row.classList.toggle('advanced-tables-filtered-row', !visible);
