@@ -14,6 +14,7 @@ const filterStateStores = new Map<string, Map<number, FilterState>>();
 const tableRefreshes = new WeakMap<HTMLTableElement, () => void>();
 const openTableMenus = new WeakMap<HTMLTableElement, () => void>();
 const storeInstances = new Map<string, Set<HTMLTableElement>>();
+const menuDocuments = new WeakSet<Document>();
 let tableEditing = false;
 
 const notifyStore = (key: string, except?: HTMLTableElement): void => {
@@ -58,10 +59,38 @@ const teardownTable = (table: HTMLTableElement): void => {
  * Changes are limited to the rendered table DOM and never update Markdown.
  */
 const menuOwners = new Map<HTMLDivElement, HTMLTableElement>();
+
+const registerOutsideMenuHandler = (doc: Document): void => {
+  if (menuDocuments.has(doc)) {
+    return;
+  }
+  menuDocuments.add(doc);
+  doc.addEventListener(
+    'pointerdown',
+    (event) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+      menuOwners.forEach((owner, menu) => {
+        if (
+          !menu.hidden &&
+          !owner.contains(target) &&
+          !menu.contains(target)
+        ) {
+          openTableMenus.get(owner)?.();
+        }
+      });
+    },
+    true,
+  );
+};
+
 export const addTableFilters = (
   container: HTMLElement,
   scope: string,
 ): void => {
+  registerOutsideMenuHandler(container.ownerDocument);
   menuOwners.forEach((owner, menu) => {
     if (!owner.isConnected) {
       menu.remove();
