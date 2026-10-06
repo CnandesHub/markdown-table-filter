@@ -180,7 +180,8 @@ const addFiltersToTable = (
     
     const filterButton = doc.createElement('button');
     filterButton.type = 'button';
-    filterButton.className = 'advanced-tables-filter-button';
+    filterButton.className =
+      'advanced-tables-filter-button clickable-icon';
     filterButton.setAttribute('aria-label', `Filter ${headerName}`);
     filterButton.setAttribute('aria-expanded', 'false');
     filterButton.innerHTML =
@@ -189,7 +190,7 @@ const addFiltersToTable = (
       '</svg>';
 
     const menu = doc.createElement('div');
-    menu.className = 'advanced-tables-filter-menu';
+    menu.className = 'advanced-tables-filter-menu menu';
     menu.hidden = true;
     doc.body.appendChild(menu);
     menuOwners.set(menu, table);
@@ -197,7 +198,7 @@ const addFiltersToTable = (
 
     const search = doc.createElement('input');
     search.type = 'search';
-    search.className = 'advanced-tables-filter-search';
+    search.className = 'advanced-tables-filter-search search-input';
     search.placeholder = 'Search values';
     search.setAttribute('aria-label', `Search ${headerName} values`);
     search.value = state.search;
@@ -275,7 +276,7 @@ const addFiltersToTable = (
 
     const apply = doc.createElement('button');
     apply.type = 'button';
-    apply.className = 'advanced-tables-filter-apply';
+    apply.className = 'advanced-tables-filter-apply mod-cta';
     apply.textContent = 'Apply filter';
     apply.addEventListener('click', () => {
       state.selectedValues =
