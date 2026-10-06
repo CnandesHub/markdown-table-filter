@@ -1,7 +1,7 @@
 {
-  "name": "advanced-tables-obsidian",
-  "version": "0.23.2",
-  "description": "Improved table navigation, formatting, manipulation, and formulas",
+  "name": "markdown-table-filter",
+  "version": "1.0.0",
+  "description": "Cosmetic filters for Markdown tables",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",

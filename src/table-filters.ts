@@ -39,7 +39,7 @@ const isDecorated = (table: HTMLTableElement): boolean => {
   const cells = table.tHead?.rows[0]?.cells;
   if (!cells || cells.length === 0) return false;
   return Array.from(cells).every((c) =>
-    c.querySelector('.advanced-tables-filter-container'),
+    c.querySelector('.markdown-table-filter-container'),
   );
 };
 
@@ -51,7 +51,7 @@ const teardownTable = (table: HTMLTableElement): void => {
     }
   });
   table
-    .querySelectorAll('.advanced-tables-filter-container')
+    .querySelectorAll('.markdown-table-filter-container')
     .forEach((el) => el.remove());
   tableRefreshes.delete(table);
 };
@@ -100,8 +100,21 @@ export const addTableFilters = (
   //   }
   // });
   Array.from(container.querySelectorAll('table')).forEach((table) => {
-    const tableKey = `${scope}::${getTableHeadersKey(table)}`;
-    let tableStates = filterStateStores.get(tableKey);
+    const headerKey = getTableHeadersKey(table);
+    const exactKey = `${scope}::${headerKey}`;
+    let tableKey = exactKey;
+    let tableStates = filterStateStores.get(exactKey);
+
+    if (!tableStates) {
+      const compatibleKeys = Array.from(filterStateStores.keys()).filter((key) =>
+        key.endsWith(`::${headerKey}`),
+      );
+      if (compatibleKeys.length === 1) {
+        tableKey = compatibleKeys[0];
+        tableStates = filterStateStores.get(tableKey);
+      }
+    }
+
     if (!tableStates) {
       tableStates = new Map();
       filterStateStores.set(tableKey, tableStates);
@@ -130,10 +143,10 @@ export const clearTableFilterVisuals = (container: HTMLElement): void => {
       if (!(row instanceof HTMLTableRowElement)) {
         return;
       }
-      row.removeAttribute('data-advanced-tables-hidden');
+      row.removeAttribute('data-markdown-table-filter-hidden');
       row.removeAttribute('aria-hidden');
       row.removeAttribute('hidden');
-      row.classList.remove('advanced-tables-filtered-row');
+      row.classList.remove('markdown-table-filtered-row');
       row.style.display = '';
     });
 };
@@ -164,7 +177,7 @@ const addFiltersToTable = (
     applyFilters(b, states);
 
   Array.from(headerRow.cells).forEach((header, columnIndex) => {
-    if (header.querySelector('.advanced-tables-filter-container')) {
+    if (header.querySelector('.markdown-table-filter-container')) {
       return;
     }
 
@@ -176,20 +189,20 @@ const addFiltersToTable = (
     let pendingValues = new Set<string>();
 
     const filterContainer = doc.createElement('span');
-    filterContainer.className = 'advanced-tables-filter-container';
+    filterContainer.className = 'markdown-table-filter-container';
     filterContainer.contentEditable = 'false';
     filterContainer.setAttribute('data-cm-ignore', 'true'); // inofensivo se não usado
     
     const filterButton = doc.createElement('button');
     filterButton.type = 'button';
     filterButton.className =
-      'advanced-tables-filter-button clickable-icon';
+      'markdown-table-filter-button clickable-icon';
     filterButton.setAttribute('aria-label', `Filter ${headerName}`);
     filterButton.setAttribute('aria-expanded', 'false');
     setIcon(filterButton, 'filter');
 
     const menu = doc.createElement('div');
-    menu.className = 'advanced-tables-filter-menu menu';
+    menu.className = 'markdown-table-filter-menu menu';
     menu.hidden = true;
     // doc.body.appendChild(menu);
     // menuOwners.set(menu, table);
@@ -197,36 +210,31 @@ const addFiltersToTable = (
 
     const search = doc.createElement('input');
     search.type = 'search';
-    search.className = 'advanced-tables-filter-search search-input';
+    search.className = 'markdown-table-filter-search search-input';
     search.placeholder = 'Search values';
     search.setAttribute('aria-label', `Search ${headerName} values`);
     search.value = state.search;
 
     const selectionActions = doc.createElement('div');
-    selectionActions.className = 'advanced-tables-filter-selection-actions';
+    selectionActions.className = 'markdown-table-filter-selection-actions';
     const selectAll = doc.createElement('button');
     selectAll.type = 'button';
-    selectAll.className = 'advanced-tables-filter-action';
+    selectAll.className = 'markdown-table-filter-action';
     selectAll.textContent = 'Select all';
     const unselectAll = doc.createElement('button');
     unselectAll.type = 'button';
-    unselectAll.className = 'advanced-tables-filter-action';
+    unselectAll.className = 'markdown-table-filter-action';
     unselectAll.textContent = 'Unselect all';
     selectionActions.append(selectAll, unselectAll);
 
     const valuesList = doc.createElement('div');
-    valuesList.className = 'advanced-tables-filter-values';
+    valuesList.className = 'markdown-table-filter-values';
 
     const updateActiveState = (): void => {
       const active =
         state.search.length > 0 ||
-        (state.selectedValues !== null &&
-          state.selectedValues.size !== getAvailableValues(
-          getRows(),
-            states,
-            columnIndex,
-          ).length);
-      filterContainer.classList.toggle('advanced-tables-filter-active', active);
+        state.selectedValues !== null;
+      filterContainer.classList.toggle('markdown-table-filter-active', active);
     };
 
     const updateValues = (): void => {
@@ -239,7 +247,7 @@ const addFiltersToTable = (
 
       visibleValues.forEach((value) => {
           const label = doc.createElement('label');
-          label.className = 'advanced-tables-filter-value';
+          label.className = 'markdown-table-filter-value';
           const checkbox = doc.createElement('input');
           checkbox.type = 'checkbox';
           checkbox.checked = pendingValues.has(value);
@@ -275,9 +283,10 @@ const addFiltersToTable = (
 
     const apply = doc.createElement('button');
     apply.type = 'button';
-    apply.className = 'advanced-tables-filter-apply mod-cta';
+    apply.className = 'markdown-table-filter-apply mod-cta';
     apply.textContent = 'Apply filter';
     apply.addEventListener('click', () => {
+      setTableEditing(false);
       state.selectedValues =
         pendingValues.size === 0 ? null : new Set(pendingValues);
       notifyStore(tableKey, table);
@@ -303,9 +312,10 @@ const addFiltersToTable = (
 
     const clear = doc.createElement('button');
     clear.type = 'button';
-    clear.className = 'advanced-tables-filter-clear';
+    clear.className = 'markdown-table-filter-clear';
     clear.textContent = 'Clear filter';
     clear.addEventListener('click', () => {
+    setTableEditing(false);
     state.selectedValues = null;
     pendingValues.clear();
     state.search = '';
@@ -320,6 +330,7 @@ const addFiltersToTable = (
 
 
   search.addEventListener('input', () => {
+    setTableEditing(false);
     state.search = search.value;
     notifyStore(tableKey, table);   // <-- NEW
     const currentBody = getBody();
@@ -340,6 +351,7 @@ const toggleMenu = (): void => {
     controls.get(columnIndex)?.close();
     return;
   }
+  setTableEditing(false);
   openTableMenus.get(table)?.();
   controls.forEach((control, controlColumnIndex) => {
     if (controlColumnIndex !== columnIndex) {
@@ -473,7 +485,7 @@ const getCellText = (cell: HTMLTableCellElement | undefined): string => {
   }
   clone
     .querySelectorAll(
-      '.advanced-tables-filter-container, .advanced-tables-filter-menu',
+      '.markdown-table-filter-container, .markdown-table-filter-menu',
     )
     .forEach((element) => element.remove());
   const value = (clone.innerText || clone.textContent || '').trim();
@@ -500,12 +512,12 @@ const applyFilters = (
     );
     row.style.display = visible ? '' : 'none';
     row.hidden = !visible;
-    row.classList.toggle('advanced-tables-filtered-row', !visible);
+    row.classList.toggle('markdown-table-filtered-row', !visible);
     row.setAttribute('aria-hidden', String(!visible));
     if (visible) {
-      row.removeAttribute('data-advanced-tables-hidden');
+      row.removeAttribute('data-markdown-table-filter-hidden');
     } else {
-      row.setAttribute('data-advanced-tables-hidden', 'true');
+      row.setAttribute('data-markdown-table-filter-hidden', 'true');
     }
   });
 };

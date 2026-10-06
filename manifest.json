@@ -1,12 +1,12 @@
 {
-  "id": "table-editor-obsidian",
-  "name": "Advanced Tables",
+  "id": "markdown-table-filter",
+  "name": "Markdown Table Filter",
   "author": "Tony Grosinger",
   "authorUrl": "https://grosinger.net",
-  "description": "Improved table navigation, formatting, manipulation, and formulas.",
+  "description": "Cosmetic filters for Markdown tables that never modify the underlying note.",
   "isDesktopOnly": false,
   "minAppVersion": "1.0.0",
-  "version": "0.23.2",
+  "version": "1.0.0",
   "fundingUrl": {
     "Github Sponsor": "https://github.com/sponsors/tgrosinger",
     "Buy me a Coffee": "https://buymeacoffee.com/tgrosinger",
