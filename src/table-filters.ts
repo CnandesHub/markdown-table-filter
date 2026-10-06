@@ -1,3 +1,5 @@
+import { setIcon } from 'obsidian';
+
 interface FilterState {
   selectedValues: Set<string> | null;
   search: string;
@@ -184,10 +186,7 @@ const addFiltersToTable = (
       'advanced-tables-filter-button clickable-icon';
     filterButton.setAttribute('aria-label', `Filter ${headerName}`);
     filterButton.setAttribute('aria-expanded', 'false');
-    filterButton.innerHTML =
-      '<svg viewBox="0 0 24 24" aria-hidden="true">' +
-      '<path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"></path>' +
-      '</svg>';
+    setIcon(filterButton, 'filter');
 
     const menu = doc.createElement('div');
     menu.className = 'advanced-tables-filter-menu menu';
