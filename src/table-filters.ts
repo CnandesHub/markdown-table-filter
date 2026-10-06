@@ -93,12 +93,12 @@ export const addTableFilters = (
   scope: string,
 ): void => {
   registerOutsideMenuHandler(container.ownerDocument);
-  menuOwners.forEach((owner, menu) => {
-    if (!owner.isConnected) {
-      menu.remove();
-      menuOwners.delete(menu);
-    }
-  });
+  // menuOwners.forEach((owner, menu) => {
+  //   if (!owner.isConnected) {
+  //     menu.remove();
+  //     menuOwners.delete(menu);
+  //   }
+  // });
   Array.from(container.querySelectorAll('table')).forEach((table) => {
     const tableKey = `${scope}::${getTableHeadersKey(table)}`;
     let tableStates = filterStateStores.get(tableKey);
@@ -191,8 +191,8 @@ const addFiltersToTable = (
     const menu = doc.createElement('div');
     menu.className = 'advanced-tables-filter-menu menu';
     menu.hidden = true;
-    doc.body.appendChild(menu);
-    menuOwners.set(menu, table);
+    // doc.body.appendChild(menu);
+    // menuOwners.set(menu, table);
     menu.addEventListener('click', (event) => event.stopPropagation());
 
     const search = doc.createElement('input');
@@ -298,8 +298,7 @@ const addFiltersToTable = (
         }
       }, 100);
       refreshControls(controls);
-      menu.hidden = true;
-      filterButton.setAttribute('aria-expanded', 'false');
+      controls.get(columnIndex)?.close();
     });
 
     const clear = doc.createElement('button');
@@ -350,6 +349,10 @@ const toggleMenu = (): void => {
   openTableMenus.set(table, () => {
     controls.get(columnIndex)?.close();
   });
+    if (!menu.isConnected) {
+    doc.body.appendChild(menu);        // NOVO
+  }
+  menuOwners.set(menu, table); 
   const buttonRect = filterButton.getBoundingClientRect();
   menu.style.top = `${buttonRect.bottom + 4}px`;
   menu.style.left = `${Math.max(8, buttonRect.right - 224)}px`;
@@ -387,6 +390,8 @@ filterButton.addEventListener('click', (event) => {
             ? new Set<string>()
             : new Set(state.selectedValues);
         menu.hidden = true;
+        menu.remove();                       // NOVO
+        menuOwners.delete(menu);
         filterButton.setAttribute('aria-expanded', 'false');
       },
       update: () => {
