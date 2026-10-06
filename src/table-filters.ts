@@ -14,6 +14,7 @@ const filterStateStores = new Map<string, Map<number, FilterState>>();
 const tableRefreshes = new WeakMap<HTMLTableElement, () => void>();
 const openTableMenus = new WeakMap<HTMLTableElement, () => void>();
 const storeInstances = new Map<string, Set<HTMLTableElement>>();
+let tableEditing = false;
 
 const notifyStore = (key: string, except?: HTMLTableElement): void => {
   const set = storeInstances.get(key);
@@ -25,6 +26,10 @@ const notifyStore = (key: string, except?: HTMLTableElement): void => {
     }
     if (t !== except) tableRefreshes.get(t)?.();
   });
+};
+
+export const setTableEditing = (editing: boolean): void => {
+  tableEditing = editing;
 };
 
 const isDecorated = (table: HTMLTableElement): boolean => {
@@ -437,13 +442,23 @@ const getCellText = (cell: HTMLTableCellElement | undefined): string => {
       '.advanced-tables-filter-container, .advanced-tables-filter-menu',
     )
     .forEach((element) => element.remove());
-  return (clone.innerText || clone.textContent || '').trim();
+  const value = (clone.innerText || clone.textContent || '').trim();
+  if (value.length % 2 === 0) {
+    const half = value.length / 2;
+    if (value.slice(0, half) === value.slice(half)) {
+      return value.slice(0, half);
+    }
+  }
+  return value;
 };
 
 const applyFilters = (
   body: HTMLTableSectionElement,
   states: Map<number, FilterState>,
 ): void => {
+  if (tableEditing) {
+    return;
+  }
   Array.from(body.rows).forEach((row) => {
     const visible = Array.from(states.entries()).every(
       ([columnIndex, state]) =>

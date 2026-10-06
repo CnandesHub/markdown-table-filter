@@ -8,6 +8,7 @@ import { TableEditor } from './table-editor';
 import {
   addTableFilters,
   refreshTableFilters,
+  setTableEditing,
 } from './table-filters';
 import { Extension, Prec } from '@codemirror/state';
 import { KeyBinding, keymap, ViewPlugin } from '@codemirror/view';
@@ -121,30 +122,47 @@ export default class TableEditorPlugin extends Plugin {
           }, 0);
         };
 
-        const onMouseDown = (): void => {
+        const onMouseDown = (event: MouseEvent): void => {
           if (leaveEditingTimer !== null) {
             window.clearTimeout(leaveEditingTimer);
             leaveEditingTimer = null;
           }
+          const target = event.target;
+          if (
+            !(target instanceof HTMLElement) ||
+            target.closest(
+              '.advanced-tables-filter-button, .advanced-tables-filter-menu',
+            ) ||
+            !target.closest('td')
+          ) {
+            return;
+          }
+          const cell = target.closest<HTMLTableCellElement>('td');
+          if (!cell) {
+            return;
+          }
+          setTableEditing(true);
         };
 
         const onFocusIn = (): void => {
-            if (leaveEditingTimer !== null) {
-              window.clearTimeout(leaveEditingTimer);
-              leaveEditingTimer = null;
-            }
+          if (leaveEditingTimer !== null) {
+            window.clearTimeout(leaveEditingTimer);
+            leaveEditingTimer = null;
+          }
+          setTableEditing(true);
         };
 
         const onFocusOut = (): void => {
-            if (leaveEditingTimer !== null) {
-              window.clearTimeout(leaveEditingTimer);
-            }
-            leaveEditingTimer = window.setTimeout(() => {
-              leaveEditingTimer = null;
-              const active = document.activeElement as HTMLElement | null;
+          if (leaveEditingTimer !== null) {
+            window.clearTimeout(leaveEditingTimer);
+          }
+          leaveEditingTimer = window.setTimeout(() => {
+            leaveEditingTimer = null;
+            const active = document.activeElement as HTMLElement | null;
             if (active && view.dom.contains(active) && active.closest('td')) {
               return;
             }
+            setTableEditing(false);
             refresh();
           }, 0);
         };
@@ -168,6 +186,7 @@ export default class TableEditorPlugin extends Plugin {
             view.dom.removeEventListener('mousedown', onMouseDown, true);
             view.dom.removeEventListener('focusin', onFocusIn, true);
             view.dom.removeEventListener('focusout', onFocusOut, true);
+            setTableEditing(false);
           },
         };
       }),
