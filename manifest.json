@@ -1,15 +1,11 @@
 {
   "id": "markdown-table-filter",
   "name": "Markdown Table Filter",
-  "author": "Tony Grosinger",
-  "authorUrl": "https://grosinger.net",
+  "author": "Carlos Fernandes",
+  "authorUrl": "https://github.com/CnandesHub",
   "description": "Cosmetic filters for Markdown tables that never modify the underlying note.",
   "isDesktopOnly": false,
-  "minAppVersion": "1.0.0",
+  "minAppVersion": "1.14.4",
   "version": "1.0.0",
-  "fundingUrl": {
-    "Github Sponsor": "https://github.com/sponsors/tgrosinger",
-    "Buy me a Coffee": "https://buymeacoffee.com/tgrosinger",
-    "Paypal": "https://paypal.me/tgrosinger"
-  }
+  "fundingUrl": "https://github.com/CnandesHub"
 }

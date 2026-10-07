@@ -1,78 +1,54 @@
-# Advanced Tables for Obsidian
+# Markdown Table Filter
 
-Add improved navigation, formatting, and manipulation to markdown tables in Obsidian:
+An Obsidian plugin that enables filtering rows in Markdown tables while keeping the tables fully editable.
 
-- Auto formatting
-- Excel-like table navigation (tab/enter between cells and rows)
-- [Spreadsheet formulas!](https://github.com/tgrosinger/advanced-tables-obsidian/blob/main/docs/help.md#using-formulas-in-markdown-tables)
-- Add, remove, and move columns and rows
-- Set column alignment (left, center, right)
-- Sort rows by a specified column
-- Export to CSV
-- Works on Obsidian Mobile (See notes below)
+This plugin adds cosmetic filters to rendered Markdown tables without changing the underlying note.
 
-## Demo
+## Features
 
-![basic functionality](https://raw.githubusercontent.com/tgrosinger/advanced-tables-obsidian/main/resources/screenshots/basic-functionality.gif)
+- **Filter table rows** using a search field or value selection.
+- **Keep tables editable**: filtered tables remain editable in Live Preview.
+- **Case-insensitive search** by default.
+- Works with standard Markdown tables in Reading View and Live Preview.
 
-## How to use
+## Installation
 
-To create a table, create a single `|` character, then type the table's first
-heading and press <kbd>Tab</kbd>. Continue entering headings and pressing
-<kbd>Tab</kbd> until all the headings are created. Press <kbd>Enter</kbd> to
-go to the first row. Continue filling cells as before, and press
-<kbd>Enter</kbd> again for each new row.
+### From Obsidian Community Plugins (recommended, once published)
 
-When a cursor is in a markdown table...
+1. Open Obsidian → Settings → Community plugins.
+2. Click “Browse” and search for “Markdown Table Filter”.
+3. Click “Install”, then “Enable”.
 
-| Hotkey                                            | Action                      |
-| ------------------------------------------------- | --------------------------- |
-| <kbd>Tab</kbd>                                    | Next Cell                   |
-| <kbd>Shift</kbd> + <kbd>Tab</kbd>                 | Previous Cell               |
-| <kbd>Enter</kbd>                                  | Next Row                    |
-| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd> | Open table controls sidebar |
+### Manual installation
 
-Or use the command palette and search "Advanced Tables". There are many
-commands available, don't forget to scroll!
+1. Download the latest release from the [Releases](https://github.com/CnandesHub/markdown-table-filter/releases) page.
+2. Extract the files into your vault:  
+   `<your-vault>/.obsidian/plugins/markdown-table-filter/`
+3. Reload Obsidian and enable the plugin in Settings → Community plugins.
 
-## Formulas and Spreadsheets in Markdown!
+## Usage
 
-![formulas demo](https://raw.githubusercontent.com/tgrosinger/advanced-tables-obsidian/main/resources/screenshots/formulas-demo.gif)
+1. Open a note containing a Markdown table.
+2. Click the filter icon in a table header.
+3. Search or select values, then click **Apply filter**. Rows that do not match are hidden visually.
+4. Edit the table as usual; the original Markdown is never changed.
 
-For more information on using formulas, visit the
-[Help Docs](https://github.com/tgrosinger/advanced-tables-obsidian/blob/main/docs/help.md).
+To clear a column filter, open its menu and click **Clear filter**. Clicking outside the menu closes it without applying pending selections.
 
-## How to Install
+## Credits
 
-### From within Obsidian
+This plugin is heavily inspired by and built on top of:
 
-From Obsidian v0.9.8+, you can activate this plugin within Obsidian by doing the following:
+- [Advanced Tables for Obsidian](https://github.com/tgrosinger/advanced-tables-obsidian) by [tgrosinger](https://github.com/tgrosinger).
 
-- Open Settings > Third-party plugin
-- Make sure Safe mode is **off**
-- Click Browse community plugins
-- Search for "Advanced Tables"
-- Click Install
-- Once installed, close the community plugins window and activate the newly installed plugin
+Thanks to the original author for the excellent foundation.
 
-## Obsidian Mobile
+## License
 
-When using Obsidian on a mobile device, the Advanced Tables plugin can be used.
-Using <kbd>Enter</kbd> and <kbd>Tab</kbd> to navigate the table will not work,
-however you can add the "Next Cell" and "Next Row" commands to the mobile
-toolbar and use them to navigate, or use the buttons from the sidebar.
+Same license as the original plugin (if applicable), or specify your own, e.g.:
 
-## Pricing
+> MIT License – see [LICENSE](LICENSE) file for details.
 
-This plugin is provided to everyone for free, however if you would like to
-say thanks or help support continued development, feel free to send a little
-my way through one of the following methods:
+## Contributing
 
-[![GitHub Sponsors](https://img.shields.io/github/sponsors/tgrosinger?style=social)](https://github.com/sponsors/tgrosinger)
-[![Paypal](https://img.shields.io/badge/paypal-tgrosinger-yellow?style=social&logo=paypal)](https://paypal.me/tgrosinger)
-[<img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="BuyMeACoffee" width="100">](https://www.buymeacoffee.com/tgrosinger)
-
-## Notes
-
-This is experimental and may have instability. It is possible that there are
-bugs which may delete data in the current note. Please make backups!
+Contributions are welcome! Please open an issue or submit a pull request on the [GitHub repository](https://github.com/CnandesHub/markdown-table-filter).
