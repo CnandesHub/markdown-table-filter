@@ -30,7 +30,9 @@ This plugin adds cosmetic filters to rendered Markdown tables without changing t
 1. Open a note containing a Markdown table.
 2. Click the filter icon in a table header.
 3. Search or select values, then click **Apply filter**. Rows that do not match are hidden visually.
-4. Edit the table as usual; the original Markdown is never changed.
+4. Edit the table as usual;
+
+
 
 To clear a column filter, open its menu and click **Clear filter**. Clicking outside the menu closes it without applying pending selections.
 
@@ -41,3 +43,7 @@ This plugin is heavily inspired by and built on top of:
 - [Advanced Tables for Obsidian](https://github.com/tgrosinger/advanced-tables-obsidian) by [tgrosinger](https://github.com/tgrosinger).
 
 Thanks to the original author for the excellent foundation.
+
+## Notes 
+
+This plugin has not been extensively tested and may contain bugs or stability issues that could lead to data loss. Please make sure to back up your data before using it.
