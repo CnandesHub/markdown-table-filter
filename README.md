@@ -21,10 +21,9 @@ This plugin adds cosmetic filters to rendered Markdown tables without changing t
 
 ### Manual installation
 
-1. Download the latest release from the [Releases](https://github.com/CnandesHub/markdown-table-filter/releases) page.
-2. Extract the files into your vault:  
-   `<your-vault>/.obsidian/plugins/markdown-table-filter/`
-3. Reload Obsidian and enable the plugin in Settings → Community plugins.
+1. Download `main.js`, `manifest.json` and `styles.css`.
+2. Put them in `<your-vault>/.obsidian/plugins/markdown-table-filter/`.
+3. In Obsidian: **Settings → Community plugins**, reload, and enable **Markdown Table Filter**.
 
 ## Usage
 
@@ -42,13 +41,3 @@ This plugin is heavily inspired by and built on top of:
 - [Advanced Tables for Obsidian](https://github.com/tgrosinger/advanced-tables-obsidian) by [tgrosinger](https://github.com/tgrosinger).
 
 Thanks to the original author for the excellent foundation.
-
-## License
-
-Same license as the original plugin (if applicable), or specify your own, e.g.:
-
-> MIT License – see [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-Contributions are welcome! Please open an issue or submit a pull request on the [GitHub repository](https://github.com/CnandesHub/markdown-table-filter).
